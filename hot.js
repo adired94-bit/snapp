@@ -14,13 +14,13 @@
     try {
       var u = universe(), rows = [];
       for (var i = 0; i < u.length; i++) {
-        try { var q = await fh('/quote?symbol=' + encodeURIComponent(u[i])); if (q && q.c > 0) { var gap = q.pc > 0 && q.o > 0 ? (q.o / q.pc - 1) * 100 : 0; rows.push({ s: u[i], i: Math.abs(q.dp || 0) * 6 + Math.abs(gap) * 3 }); } }
+        try { var q = await fh('/quote?symbol=' + encodeURIComponent(u[i])); if (q && q.c > 0) { var gap = q.pc > 0 && q.o > 0 ? (q.o / q.pc - 1) * 100 : 0; rows.push({ s: u[i], i: Math.abs(q.dp || 0) * 6 + Math.abs(gap) * 3, c: q.c, dp: q.dp, gap: gap }); } }
         catch (e) { if (/401|403/.test(e.message)) break; }
       }
-      if (rows.length >= 8) { rows.sort(function (a, b) { return b.i - a.i; }); cache = { t: Date.now(), syms: rows.slice(0, 14).map(function (r) { return r.s; }) }; try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch (e) { } try { loadTape(); } catch (e2) { } }
+      if (rows.length >= 8) { rows.sort(function (a, b) { return b.i - a.i; }); cache = { t: Date.now(), syms: rows.slice(0, 14).map(function (r) { return r.s; }), rows: rows.slice(0, 20) }; try { localStorage.setItem(KEY, JSON.stringify(cache)); } catch (e) { } try { loadTape(); } catch (e2) { } }
     } finally { busy = false; }
   }
-  window.__hot = { list: list, refresh: refresh, DEF: DEF };
+  window.__hot = { movers: function () { return (cache && cache.rows) || []; }, list: list, refresh: refresh, DEF: DEF };
   setTimeout(function () { try { loadTape(); } catch (e) { } }, 300);
   setTimeout(refresh, 2500); setInterval(refresh, TTL);
 })();

@@ -1134,15 +1134,15 @@ function sizer(){const r=+$('#szRisk').value,e=+$('#szEntry').value,s=+$('#szSto
 const APP=location.pathname+'?go=';
 /* לכל משימה: כפתורים שפותחים בלשונית חדשה את המקום שבו מבצעים אותה, עם נתוני אמת */
 const DAILY_LINKS=[
-  [['נתוני שוק','https://finviz.com/futures.ashx'],['לפני הפתיחה','https://www.cnbc.com/pre-markets/']],
-  [['יומן כלכלי','https://www.tradingview.com/economic-calendar/'],['דוחות היום','https://finance.yahoo.com/calendar/earnings']],
-  [['חדשות','https://finviz.com/news.ashx'],['מניות מובילות','https://finviz.com/screener.ashx?v=111&s=ta_topgainers']],
+  [['שוק',APP+'p-brief&tab=market']],
+  [['יומן ודוחות',APP+'p-brief&tab=cal']],
+  [['חדשות ומובילות',APP+'p-brief&tab=news']],
   [['סריקה',APP+'p-smart']],
   [['רמות',APP+'p-lvl'],['גרף',APP+'p-today']],
   [['מחשבון עסקה',APP+'p-calc']],
   [['מחשבון סיכון',APP+'p-calc']],
   [['התיק',APP+'p-port']],
-  [['שעון וול סטריט','https://www.tradinghours.com/markets/nyse']]];
+  [['שעון מסחר',APP+'p-brief&tab=clock']]];
 function renderDaily(){
   if(D.daily.date!==todayStr()){D.daily={date:todayStr(),checks:DAILY.map(()=>false)}}
   const done=D.daily.checks.filter(Boolean).length;$('#dailyCount').textContent=`${done}/${DAILY.length}`;$('#dailyBar').style.width=done/DAILY.length*100+'%';
@@ -1988,7 +1988,7 @@ function renderAll(){renderMovers();renderRules();renderEvList();renderWatch();r
   if(D.watch&&!D.watch.some(w=>w.tape)){D.watch.slice(0,2).forEach(w=>w.tape=true)}
   if(!D.watchV||D.watchV<2){D.watch=JSON.parse(JSON.stringify(DEFAULT.watch));D.watchV=2;await save()}
   D.rules={...DEFAULT.rules,...(D.rules||{})};D.weekly=D.weekly||{};
-  loadSettingsUI();if(S.mode==='demo'){MODE='demo';document.body.classList.add('demo');$('#jModeNote').style.display='';$$('#modeSw button').forEach(b=>{b.classList.toggle('on',b.dataset.mode==='demo');b.classList.toggle('demo',b.dataset.mode==='demo')})}renderAll();loadTape();curSym='MSTR';renderTicket();setTimeout(firstRun,800);{const go=new URLSearchParams(location.search).get('go');if(go&&document.getElementById(go))setTimeout(()=>goPage(go),500)}setSync(SB?'ok':'off');
+  loadSettingsUI();if(S.mode==='demo'){MODE='demo';document.body.classList.add('demo');$('#jModeNote').style.display='';$$('#modeSw button').forEach(b=>{b.classList.toggle('on',b.dataset.mode==='demo');b.classList.toggle('demo',b.dataset.mode==='demo')})}renderAll();loadTape();curSym='MSTR';renderTicket();setTimeout(firstRun,800);{const go=new URLSearchParams(location.search).get('go');if(go&&document.getElementById(go))setTimeout(()=>{goPage(go);onEnter(go)},500)}setSync(SB?'ok':'off');
   if(D.analyses['MSTR']){lastAnalysis=D.analyses['MSTR'];renderAnalysis(lastAnalysis);$('#aiToPlan').disabled=false}
   startMonitor();autoNews();startNewsTimer();ibkrSync();setLive(S.liveCh||'tv10');setTimeout(()=>moversScan(true),4000);
   document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&SB){const r=await sbGet();if(r&&(r.updatedAt||0)>(D.updatedAt||0)){D={...D,...r};await store.setLocal(D);renderAll();toast('עודכן מהענן')}}});
@@ -2004,7 +2004,7 @@ function renderAll(){renderMovers();renderRules();renderEvList();renderWatch();r
 <script src="heat.js"></script>
 <script src="sync.js"></script>
 <script src="market.js"></script>
-<script src="scan.js"></script><script src="hot.js"></script><script src="wire.js"></script>
+<script src="scan.js"></script><script src="hot.js"></script><script src="wire.js"></script><script src="brief.js"></script>
 <script src="theme.js"></script>
 </body>
 </html>
