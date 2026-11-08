@@ -44,12 +44,14 @@
   }
 
   /* ---------- מחקר ברשת ---------- */
+  /* כותרות אמיתיות מ-48 השעות האחרונות שכבר נאספו (Finnhub וזרם החדשות): המחקר חייב להתחשב בהן */
+  function heads(res) { var h = DP.headlines ? DP.headlines(res).slice(0, 10) : []; return h.length ? '\nכותרות מהימים האחרונים שכבר נמצאו על המניה (התחשב בהן בציונים, והתעלם מכותרות שאינן קשורות):\n' + h.map(function (x) { return '- ' + x.title + (x.src ? ' (' + x.src + ')' : ''); }).join('\n') : ''; }
   async function loadAI(res, force) {
     if (!aiKey()) return { err: 'למחקר חדשות ומאקרו צריך מפתח בינה (Anthropic או Gemini) בהגדרות.' };
     var hit = cache[res.sym]; if (!force && hit && Date.now() - hit.t < TTL) return hit.data;
     try {
       var prof = res.fund && res.fund.profile || {}, nm = prof.name ? prof.name + ' (' + res.sym + ')' : res.sym;
-      var raw = await claude([{ role: 'user', content: 'מניה: ' + nm + (prof.finnhubIndustry ? '. ענף: ' + prof.finnhubIndustry : '') + '. היום: ' + new Date().toISOString().slice(0, 10) + '.' }],
+      var raw = await claude([{ role: 'user', content: 'מניה: ' + nm + (prof.finnhubIndustry ? '. ענף: ' + prof.finnhubIndustry : '') + '. היום: ' + new Date().toISOString().slice(0, 10) + '.' + heads(res) }],
         { system: SYS, tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 8 }], max_tokens: 4200, tier: 'smart' });
       var j = parseJSON(raw), out = { bias: ['bullish', 'bearish', 'mixed'].indexOf(j.bias) >= 0 ? j.bias : 'mixed', bias_reason: j.bias_reason || '', t: Date.now() };
       SEC.forEach(function (s) { out[s[0]] = (Array.isArray(j[s[0]]) ? j[s[0]] : []).filter(function (i) { return i && i.point && i.url && /^https?:/.test(i.url); }).slice(0, 4); });

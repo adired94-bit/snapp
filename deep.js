@@ -198,16 +198,34 @@
      טכני + חדשות החברה + מאקרו + סקטור + פוליטיקה ורגולציה + אנליסטים + יסודות + מצב השוק.
      כל רכיב מ-100- (שורט) עד 100+ (לונג). המשקלות תלויים באופק: ביומי הטכני והחדשות מובילים, בארוך היסודות והאנליסטים. */
   var UW = {
-    day:   { tech: 0.45, company: 0.15, macro: 0.10, sector: 0.10, politics: 0.05, analysts: 0.05, fund: 0.05, regime: 0.05 },
-    swing: { tech: 0.30, company: 0.12, macro: 0.12, sector: 0.10, politics: 0.06, analysts: 0.12, fund: 0.12, regime: 0.06 },
-    long:  { tech: 0.20, company: 0.08, macro: 0.12, sector: 0.10, politics: 0.05, analysts: 0.15, fund: 0.24, regime: 0.06 } };
-  var UL = { tech: 'טכני', company: 'חדשות החברה', macro: 'מאקרו', sector: 'הסקטור', politics: 'פוליטיקה ורגולציה', analysts: 'אנליסטים', fund: 'יסודות החברה', regime: 'מצב השוק' };
+    day:   { tech: 0.40, headlines: 0.12, company: 0.12, macro: 0.10, sector: 0.10, politics: 0.05, analysts: 0.05, fund: 0.05, regime: 0.05 },
+    swing: { tech: 0.28, headlines: 0.10, company: 0.10, macro: 0.12, sector: 0.10, politics: 0.06, analysts: 0.12, fund: 0.12, regime: 0.06 },
+    long:  { tech: 0.20, headlines: 0.05, company: 0.07, macro: 0.12, sector: 0.10, politics: 0.05, analysts: 0.15, fund: 0.24, regime: 0.06 } };
+  var UL = { tech: 'טכני', headlines: 'כותרות אחרונות', company: 'חדשות החברה', macro: 'מאקרו', sector: 'הסקטור', politics: 'פוליטיקה ורגולציה', analysts: 'אנליסטים', fund: 'יסודות החברה', regime: 'מצב השוק' };
   var ENTRY = 40, LEAN = 18, GATE_OLD = 'ציון מאוחד עבר סף כניסה ללא ווטו', GATE_NEW = 'הציון המשולב מספיק חזק';
   var cv = function (x) { return Math.max(-100, Math.min(100, x)); };
+  /* כותרות אחרונות על המניה: מ-Finnhub ומזרם החדשות של האתר (48 שעות), עם ניקוד גם לעברית */
+  var HPOS = ['זינוק', 'זינק', 'מזנק', 'מזנקת', 'שיא', 'שדרוג', 'משדרג', 'מעלה', 'עולה', 'עלייה', 'צמיחה', 'רווח', 'חיובי', 'הסכם', 'אישור', 'מאשר', 'חוזה', 'יעד מחיר', 'ממליץ לקנות', 'מכה את התחזיות', 'חזק'];
+  var HNEG = ['צונח', 'צנח', 'קריסה', 'קורס', 'הורדת', 'מוריד', 'הפסד', 'תביעה', 'חקירה', 'אזהרה', 'שלילי', 'פיטורים', 'עיכוב', 'יורד', 'ירידה', 'חלש', 'מפספס', 'מכירה', 'סיכון'];
+  function headSent(text) {
+    var sc = AT.data.sentiment(text), t = String(text || ''), p = 0, n = 0;
+    HPOS.forEach(function (w) { if (t.indexOf(w) >= 0) p++; }); HNEG.forEach(function (w) { if (t.indexOf(w) >= 0) n++; });
+    if (p + n) sc = sc !== 0 ? (sc + (p - n) / (p + n)) / 2 : (p - n) / (p + n);
+    return sc;
+  }
+  function headlines(res) {
+    var cut = Date.now() - 2 * 864e5, out = [], seen = {}, sym = res.sym.replace('/USD', ''), prof = res.fund && res.fund.profile || {}, nm = (prof.name || '').split(/[ ,.]/)[0] || '';
+    var add = function (title, src, url, t, summary) { if (!title || seen[title]) return; if (t && t < cut) return; seen[title] = 1; out.push({ title: title, src: src || '', url: url || '', t: t || 0, s: headSent(title + ' ' + (summary || '')) }); };
+    ((res.news && res.news.items) || []).forEach(function (i) { add(i.headline, i.source, i.url, i.t || (i.datetime ? i.datetime * 1000 : 0), i.summary); });
+    var re = sym.length >= 3 ? new RegExp('(^|[^A-Za-z])' + sym + '([^A-Za-z]|$)') : null, nre = nm.length >= 4 ? new RegExp(nm, 'i') : null;
+    ((window.__wire && window.__wire.state && window.__wire.state.items) || []).forEach(function (i) { var t = i.title || ''; if ((re && re.test(t)) || (nre && nre.test(t))) add(t, i.src, i.link, i.t); });
+    return out.sort(function (a, b) { return b.t - a.t; }).slice(0, 12);
+  }
   function uniParts(res, m, k) {
     var W = UW[k], P = [], ai = res.ctx && res.ctx.ai && !res.ctx.ai.err ? res.ctx.ai : null, sc = (ai && ai.scores) || {};
     var add = function (key, v, detail) { if (v == null || !isFinite(v)) return; P.push({ k: key, label: UL[key], w: W[key], v: Math.round(cv(v)), detail: detail || '' }); };
     add('tech', m.ex.score, m.ex.headline);
+    var hl = headlines(res); if (hl.length >= 2) { var pos = hl.filter(function (x) { return x.s > 0.2; }).length, neg = hl.filter(function (x) { return x.s < -0.2; }).length, avg = hl.reduce(function (a, x) { return a + x.s; }, 0) / hl.length; add('headlines', avg * 100 * Math.min(1, hl.length / 3), hl.length + ' כותרות ב-48 שעות: ' + pos + ' חיוביות, ' + neg + ' שליליות'); }
     ['company', 'macro', 'sector', 'politics'].forEach(function (c) { if (ai && sc[c] != null) add(c, sc[c] * 50, ai[c] && ai[c][0] ? ai[c][0].point : ''); });
     var rec = res.fund && res.fund.rec, share = null;
     if (rec) { var tot = (rec.strongBuy || 0) + (rec.buy || 0) + (rec.hold || 0) + (rec.sell || 0) + (rec.strongSell || 0); if (tot) share = ((rec.strongBuy || 0) + (rec.buy || 0)) / tot; }
@@ -218,20 +236,20 @@
     return P;
   }
   function uniFor(res, m, k) {
-    var P = uniParts(res, m, k), sw = 0, sv = 0; P.forEach(function (p) { sw += p.w; sv += p.w * p.v; });
-    var S0 = sw ? sv / sw : 0, dir = S0 >= 0 ? 'long' : 'short', sg = S0 >= 0 ? 1 : -1, agreeW = 0;
+    var P = uniParts(res, m, k), sw = 0, sv = 0, totW = Object.keys(UW[k]).reduce(function (a, x) { return a + UW[k][x]; }, 0); P.forEach(function (p) { sw += p.w; sv += p.w * p.v; });
+    var cov = sw / totW, S0 = sw ? sv / sw : 0, dir = S0 >= 0 ? 'long' : 'short', sg = S0 >= 0 ? 1 : -1, agreeW = 0;
     P.forEach(function (p) { if (p.v * sg >= 15) agreeW += p.w; });
     var agree = sw ? agreeW / sw : 0, tech = P.filter(function (p) { return p.k === 'tech'; })[0], nw = 0, nv = 0;
-    P.forEach(function (p) { if (['company', 'macro', 'sector', 'politics'].indexOf(p.k) >= 0) { nw += p.w; nv += p.w * p.v; } });
+    P.forEach(function (p) { if (['headlines', 'company', 'macro', 'sector', 'politics'].indexOf(p.k) >= 0) { nw += p.w; nv += p.w * p.v; } });
     var ctxV = nw ? nv / nw : null, conflict = !!(tech && ctxV != null && tech.v * ctxV < 0 && Math.abs(tech.v) >= 30 && Math.abs(ctxV) >= 30);
     var vet = m.an.combined.vetoes.length > 0, side = dir === 'long' ? 'לונג' : 'שורט', loading = !!(res.ctx && res.ctx.status === 'loading'), hasCtx = !!(res.ctx && res.ctx.ai && !res.ctx.ai.err);
     var stance = 'flat', headline;
-    if (Math.abs(S0) >= ENTRY && agree >= 0.6 && !conflict && sw >= 0.8 && !vet && !loading) { stance = dir; headline = 'כניסה ל' + side + ': רוב הרכיבים מצביעים לאותו כיוון'; }
+    if (Math.abs(S0) >= ENTRY && agree >= 0.6 && !conflict && cov >= 0.8 && !vet && !loading) { stance = dir; headline = 'כניסה ל' + side + ': רוב הרכיבים מצביעים לאותו כיוון'; }
     else if (Math.abs(S0) >= LEAN) {
       stance = 'lean_' + dir;
-      headline = 'נטייה ל' + side + ', אבל ' + (loading ? 'עדיין מחפשים חדשות ומאקרו' : conflict ? 'יש סתירה בין הניתוח הטכני לחדשות והמאקרו' : vet ? 'טווח זמן גבוה מתנגד' : agree < 0.6 ? 'לא מספיק רכיבים מסכימים' : sw < 0.8 ? 'חסר מידע (' + (hasCtx ? 'יסודות ואנליסטים' : 'חדשות ומאקרו') + ')' : 'הציון עוד לא מספיק חזק לכניסה');
+      headline = 'נטייה ל' + side + ', אבל ' + (loading ? 'עדיין מחפשים חדשות ומאקרו' : conflict ? 'יש סתירה בין הניתוח הטכני לחדשות והמאקרו' : vet ? 'טווח זמן גבוה מתנגד' : agree < 0.6 ? 'לא מספיק רכיבים מסכימים' : cov < 0.8 ? 'חסר מידע (' + (hasCtx ? 'יסודות ואנליסטים' : 'חדשות ומאקרו') + ')' : 'הציון עוד לא מספיק חזק לכניסה');
     } else headline = loading ? 'עדיין מחפשים חדשות ומאקרו' : 'אין כיוון ברור: להמתין';
-    return { score: Math.round(S0), entry: Math.round(Math.abs(S0)), dir: dir, stance: stance, headline: headline, parts: P, agree: agree, agreeN: P.filter(function (p) { return p.v * sg >= 15; }).length, n: P.length, coverage: sw, conflict: conflict, loading: loading };
+    return { score: Math.round(S0), entry: Math.round(Math.abs(S0)), dir: dir, stance: stance, headline: headline, parts: P, agree: agree, agreeN: P.filter(function (p) { return p.v * sg >= 15; }).length, n: P.length, coverage: cov, conflict: conflict, loading: loading };
   }
   function unify(res) {
     ['day', 'swing', 'long'].forEach(function (k) {
@@ -607,5 +625,5 @@
   var snap = document.getElementById('snap');
   if (snap && !document.getElementById('deepBtn')) { var b = document.createElement('button'); b.className = 'btn small'; b.id = 'deepBtn'; b.textContent = 'ניתוח'; b.onclick = function () { openDeep(curSym === 'BTC' ? 'BTC/USD' : curSym); }; snap.parentNode.insertBefore(b, snap); }
   build();
-  window.__deep = { unify: unify, mkPlan: mkPlan, uniFor: uniFor, verdictOf: verdictOf, repaint: function () { paint(); }, getClient: client, trendTemplate: trendTemplate, regimeOf: regimeOf, dayLevels: dayLevels, orbPlan: orbPlan, quality: quality, E: E, buildMode: buildMode, fundScore: fundScore, state: DEEP, run: run };
+  window.__deep = { headlines: headlines, unify: unify, mkPlan: mkPlan, uniFor: uniFor, verdictOf: verdictOf, repaint: function () { paint(); }, getClient: client, trendTemplate: trendTemplate, regimeOf: regimeOf, dayLevels: dayLevels, orbPlan: orbPlan, quality: quality, E: E, buildMode: buildMode, fundScore: fundScore, state: DEEP, run: run };
 })();
