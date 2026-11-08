@@ -273,3 +273,22 @@ section.page.on>.today>*:nth-child(n+6){animation-delay:.2s}
 .ht-rows{margin-top:12px;display:grid;gap:5px}.ht-rows>b{font-size:12px;letter-spacing:.1em;color:var(--ink2);text-transform:uppercase}
 .ht-r{display:flex;justify-content:space-between;gap:8px;padding:7px 11px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;font-size:13px}.ht-r b{font-family:var(--mono);font-size:12.5px}.ht-r small{color:var(--ink2)}
 .ht-set{margin-top:12px}.ht-set summary{cursor:pointer;color:var(--ink2);font-size:12.5px;font-weight:700}.ht-set .rc-grid{margin-top:10px}
+
+/* ====================== סריקה חכמה ושוק ====================== */
+.sm-txt{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;color:var(--ink);font-family:var(--mono);font-size:14px;padding:10px 12px;margin:4px 0 10px;resize:vertical;direction:ltr;text-align:left;text-transform:uppercase}
+.sm-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:8px 0}.sm-sum div{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:9px 4px;text-align:center}
+.sm-sum b{display:block;font-family:var(--mono);font-size:22px}.sm-sum span{font-size:11px;color:var(--ink2);font-weight:700}
+.sm-r{padding:13px 14px;margin-bottom:10px;border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.028),transparent 40%),var(--panel);border:1px solid var(--line);border-inline-start:4px solid var(--ink2);animation:rise .45s var(--ease) both}
+.sm-r.long{border-inline-start-color:var(--up)}.sm-r.short{border-inline-start-color:var(--down)}
+.sm-r.s2{box-shadow:0 0 0 1px rgba(255,176,32,.35),0 14px 34px -18px rgba(255,176,32,.5)}
+.sm-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.sm-h .tk{font-family:var(--mono);font-size:19px;font-weight:800;letter-spacing:-.5px}
+.sm-px{font-family:var(--mono);font-size:13px;direction:ltr}.sm-px em{font-style:normal;font-weight:700}
+.sm-v{margin-inline-start:auto;padding:3px 11px;border-radius:999px;font-size:12px;font-weight:800;border:1px solid var(--line)}
+.sm-v.long{color:var(--up);border-color:rgba(25,214,138,.45);background:rgba(25,214,138,.09)}.sm-v.short{color:var(--down);border-color:rgba(255,77,94,.45);background:rgba(255,77,94,.09)}
+.sm-sc{display:grid;grid-template-columns:1fr 40px;gap:10px;align-items:center;margin:9px 0 8px}.sm-sc b{font-family:var(--mono);font-size:14px;text-align:left;direction:ltr}
+.sm-d{display:grid;grid-template-columns:auto auto 1fr;gap:8px;align-items:start;font-size:12.5px;line-height:1.45}.sm-d i{width:9px;height:9px;border-radius:50%;margin-top:5px;background:var(--ink2)}.sm-d b{font-size:13px}.sm-d span{grid-column:1/-1;color:var(--ink2)}
+.sm-d.entry i{background:var(--btc);box-shadow:0 0 10px var(--btc)}.sm-d.entry b{color:var(--btc)}.sm-d.prep i{background:var(--blue)}.sm-d.prep b{color:var(--blue)}
+.sm-kv{margin-top:7px;font-size:12px;color:var(--ink2);line-height:1.6}.sm-kv em{font-style:normal;color:var(--btc);font-weight:800}
+.sm-pl{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:9px;padding:9px 11px;background:var(--panel2);border:1px solid var(--line);border-radius:11px;font-size:12px;color:var(--ink2)}.sm-pl b{font-family:var(--mono);font-size:13px;color:var(--ink)}.sm-pl b.up{color:var(--up)}.sm-pl b.down{color:var(--down)}
+.sm-a{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-top:10px}.sm-a button{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:9px 4px;font:inherit;font-size:12.5px;font-weight:700;transition:all .2s var(--ease)}.sm-a button:hover{border-color:var(--btc);color:var(--btc)}
+.mk-wrap{padding:6px}.mk-box{min-height:560px;border-radius:12px;overflow:hidden}
