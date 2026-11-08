@@ -387,6 +387,18 @@
   function tile(k, v, cls, sub) { return '<div class="dp-tile ' + (cls || '') + '"><span>' + k + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>'; }
   function bar(v) { var p = Math.round(Math.abs(v) * 50); return '<div class="dp-bar"><i class="' + (v >= 0 ? 'pos' : 'neg') + '" style="' + (v >= 0 ? 'right:50%;' : 'left:50%;') + 'width:' + p + '%"></i></div>'; }
 
+  /* לפני השקלול: כותרת בלבד. הנתונים (טכני, יסודות, אירועים, חדשות) מתחת, והכפתור "שקלול" מכריע */
+  function headHtml(r) {
+    var q = r.quote, chg = q && q.changePct != null ? q.changePct : null, c = cap(r.fund && r.fund.profile ? r.fund.profile.marketCapitalization : null);
+    return '<section class="dp-hero flat"><div class="dp-top"><div class="dp-id"><b class="dp-sym">' + esc(r.sym) + '</b><span>' + esc((r.fund && r.fund.profile && r.fund.profile.name) || '') + (r.fund && r.fund.profile && r.fund.profile.finnhubIndustry ? ' · ' + esc(r.fund.profile.finnhubIndustry) : '') + '</span>' + (c.cls ? '<em class="dp-cap">' + c.cls + ' · ' + c.txt + '</em>' : '') + '</div>' +
+      '<div class="dp-px"><b>$' + px(r.price) + '</b>' + (chg != null ? '<span class="' + (chg >= 0 ? 'up' : 'down') + '">' + (chg >= 0 ? '+' : '') + num(chg, 2) + '%</span>' : '') + '</div></div></section>';
+  }
+  function weighHtml(r) {
+    var loading = r.ctx && r.ctx.status === 'loading';
+    return '<section class="dp-card dp-weigh-card"><button class="btn dp-weigh" id="dpWeigh"' + (loading ? ' disabled' : '') + '>' + (loading ? 'מחכה לחדשות ולמאקרו…' : 'שקלול: לאן להיכנס?') + '</button>' +
+      '<div class="dp-foot" style="text-align:right">הנתונים מתחת: טכני, יסודות, אירועים היסטוריים, חדשות ומאקרו. השקלול מחבר אותם להחלטה אחת (לונג, שורט או להמתין) עם כניסה, סטופ ויעדים, ושומר את הניתוח בתיקיית "ניתוחי מניות" לבדיקה אחר כך.</div></section>';
+  }
+  function weigh(r) { r.weighed = true; unify(r); paint(); window.scrollTo(0, 0); if (window.__lib) window.__lib.saveAnalysis(r); }
   function heroHtml(r, m) {
     var V = verdictOf(m), st = STANCE[V.stance] || STANCE.flat, side = V.stance.indexOf('long') >= 0 ? 'long' : V.stance.indexOf('short') >= 0 ? 'short' : 'flat';
     var q = r.quote, chg = q && q.changePct != null ? q.changePct : null, c = cap(r.fund && r.fund.profile ? r.fund.profile.marketCapitalization : null);
@@ -545,16 +557,16 @@
     var r = DEEP.res;
     if (!r) { host.innerHTML = DEEP.busy ? '<div class="dp-skel"><i></i><i></i><i></i></div>' : ''; return; }
     var m = r.modes[DEEP.mode];
-    if (DEEP.full == null) { try { DEEP.full = localStorage.getItem('adir-dpfull') === '1'; } catch (e) { DEEP.full = false; } }
-    var more = (window.DeepCtx ? DeepCtx.html(r) : '') + (DEEP.mode === 'day' ? dayHtml(r) : trendHtml(r) + (DEEP.mode === 'long' ? qualityHtml(r) : '')) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m);
-    host.innerHTML = heroHtml(r, m) + regimeHtml(r) + uniHtml(m) + planHtml(r, m) + gatesHtml(m) + '<button class="btn ghost dp-morebtn" id="dpMoreBtn">' + (DEEP.full ? 'הסתר פירוט' : 'הצג פירוט מלא: חדשות, מאקרו, גרפים, יסודות ועוד') + '</button>' + (DEEP.full ? more : '') +
+    var data = (window.DeepCtx ? DeepCtx.html(r) : '') + (DEEP.mode === 'day' ? dayHtml(r) : trendHtml(r) + (DEEP.mode === 'long' ? qualityHtml(r) : '')) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m);
+    var wt = r.weighed ? heroHtml(r, m) + regimeHtml(r) + uniHtml(m) + planHtml(r, m) + gatesHtml(m) : headHtml(r) + regimeHtml(r) + weighHtml(r);
+    host.innerHTML = wt + data +
       '<div class="dp-foot">נוצר ' + new Date(r.at).toLocaleTimeString('he-IL') + '. כלי עזר אישי ולא ייעוץ השקעות. כל החלטה וכל הוראה באחריותך.</div>';
     $q('#dpOut').querySelectorAll('.dp-card,.dp-hero').forEach(function (el, i) { el.style.animationDelay = (i * 55) + 'ms'; });
     host.querySelectorAll('.dp-chip').forEach(function (b) { b.onclick = function () { DEEP.mode = b.dataset.mode; paint(); }; });
     var cv = $q('#dpChart'); if (cv && m.plan) { var tf = m.plan.tf; drawChart(cv, r.bars[tf] || [], m.plan, m.base); }
     var sv = $q('#dpSave'); if (sv) sv.onclick = function () { saveTrade(r, m); };
     var al = $q('#dpAlert'); if (al) al.onclick = function () { if (window.__pro) window.__pro.alertsFor(r, m); };
-    var mb = $q('#dpMoreBtn'); if (mb) mb.onclick = function () { DEEP.full = !DEEP.full; try { localStorage.setItem('adir-dpfull', DEEP.full ? '1' : ''); } catch (e) { } paint(); };
+    var wb = $q('#dpWeigh'); if (wb) wb.onclick = function () { weigh(r); };
     var cp = $q('#dpCopy'); if (cp) cp.onclick = function () { copyPlan(r, m); };
     var cb = $q('#dpChartBtn'); if (cb) cb.onclick = function () { goPage('p-today'); onEnter('p-today'); loadChart(r.sym === 'BTC/USD' ? 'BTC' : r.sym); };
     if (window.DeepCtx) DeepCtx.bind();
@@ -630,5 +642,5 @@
   var snap = document.getElementById('snap');
   if (snap && !document.getElementById('deepBtn')) { var b = document.createElement('button'); b.className = 'btn small'; b.id = 'deepBtn'; b.textContent = 'ניתוח'; b.onclick = function () { openDeep(curSym === 'BTC' ? 'BTC/USD' : curSym); }; snap.parentNode.insertBefore(b, snap); }
   build();
-  window.__deep = { headlines: headlines, unify: unify, mkPlan: mkPlan, uniFor: uniFor, verdictOf: verdictOf, repaint: function () { paint(); }, getClient: client, trendTemplate: trendTemplate, regimeOf: regimeOf, dayLevels: dayLevels, orbPlan: orbPlan, quality: quality, E: E, buildMode: buildMode, fundScore: fundScore, state: DEEP, run: run };
+  window.__deep = { weigh: weigh, drawChart: drawChart, headlines: headlines, unify: unify, mkPlan: mkPlan, uniFor: uniFor, verdictOf: verdictOf, repaint: function () { paint(); }, getClient: client, trendTemplate: trendTemplate, regimeOf: regimeOf, dayLevels: dayLevels, orbPlan: orbPlan, quality: quality, E: E, buildMode: buildMode, fundScore: fundScore, state: DEEP, run: run };
 })();
