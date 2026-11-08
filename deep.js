@@ -168,6 +168,7 @@
       var price = quote && quote.price ? quote.price : (bars['5m'] && bars['5m'].length ? bars['5m'][bars['5m'].length - 1].c : bars['1D'] && bars['1D'].length ? bars['1D'][bars['1D'].length - 1].c : null);
       var res = { sym: sym, bars: bars, errors: errors, news: news, earn: earn, days: days, fund: fund, fs: fundScore(fund, price), quote: quote, price: price, modes: {}, at: Date.now(), ai: {} };
       ['day', 'swing', 'long'].forEach(function (m) { var r = buildMode(bars, m, { news: news, days: days }); r.gates = gatesFor(res, r, bars); res.modes[m] = r; });
+      try { if (bars['1D'] && bars['1D'].length >= 140) res.bt = E.backtest(bars['1D'], { window: 120, start: 90, horizon: 20, mult: 1.5, rr: 2, cooldown: 3 }); } catch (e) { res.bt = null; }
       DEEP.res = res; setMsg('');
     }).catch(function (e) { DEEP.res = null; setMsg('שגיאה: ' + e.message); })
       .then(function () { DEEP.busy = false; paint(); });
@@ -243,7 +244,7 @@
       '<div class="dp-tiles">' + tile('כניסה', '$' + px(p.entry), 'ent', 'אזור $' + px(Math.min(p.zoneLo, p.zoneHi)) + ' – $' + px(Math.max(p.zoneLo, p.zoneHi))) + tile('סטופ לוס', '$' + px(p.stop), 'neg', '−' + num(p.riskPct, 2) + '%') +
       tile('יעד 1 · 2R', '$' + px(p.t1), 'pos', 'R:R 1:' + num(p.rr1, 1)) + tile('יעד 2 · 3R', '$' + px(p.t2), 'pos', 'R:R 1:' + num(p.rr2, 1)) + sz + '</div>' + obst +
       '<div class="dp-rules"><div><b>משך החזקה</b><span>' + p.hold + '</span></div><div><b>ניהול העסקה</b><span>' + p.trail + '</span></div><div><b>ביטול התרחיש</b><span>' + (long ? 'סגירה מתחת ל-$' + px(p.stop) : 'סגירה מעל $' + px(p.stop)) + ', או שהציון מתהפך לכיוון ההפוך.</span></div></div>' +
-      '<div class="dp-actions"><button class="btn" id="dpSave">📓 שמור ליומן כעסקה מתוכננת</button><button class="btn ghost" id="dpCopy">⎘ העתק תוכנית</button><button class="btn ghost" id="dpChartBtn">📈 פתח בגרף</button></div></section>';
+      '<div class="dp-actions"><button class="btn" id="dpSave">📓 שמור ליומן כעסקה מתוכננת</button><button class="btn ghost" id="dpCopy">⎘ העתק תוכנית</button><button class="btn ghost" id="dpCalcBtn">🧮 מחשבון</button><button class="btn ghost" id="dpChartBtn">📈 גרף</button></div></section>';
   }
   function gatesHtml(m) {
     var g = m.gates;
@@ -290,7 +291,16 @@
     L = up.concat(dn); L.push({ p: price, t: 'מחיר עכשיו', n: '', c: 'now' });
     L.sort(function (a, c) { return c.p - a.p; });
     var rows = L.map(function (x) { var d = (x.p - price) / price * 100; return '<div class="dp-lvl ' + x.c + '"><b>$' + px(x.p) + '</b><span>' + x.t + '</span><em>' + x.n + '</em><small>' + (x.c === 'now' ? '' : (d >= 0 ? '+' : '') + num(d, 1) + '% · ' + num(Math.abs(x.p - price) / b.atr, 1) + ' ATR') + '</small></div>'; }).join('');
-    return '<section class="dp-card"><h3>סולם רמות <small>5 מעל ו-5 מתחת למחיר</small></h3><div class="dp-lvls">' + rows + '</div></section>';
+    return '<section class="dp-card"><h3>סולם רמות <small>5 מעל ו-5 מתחת למחיר</small></h3><div class="dp-lvls">' + rows + '</div><div class="dp-actions" style="grid-template-columns:1fr;margin-top:10px"><button class="btn ghost" id="dpLvl">📍 שמור את האזורים למעקב והתראות</button></div></section>';
+  }
+  function btHtml(r) {
+    var b = r.bt; if (!b || !b.total) return '';
+    var order = ['70+', '50-69', '30-49'], rows = order.filter(function (k) { return b.buckets[k]; }).map(function (k) {
+      var x = b.buckets[k], wr = Math.round(x.winRate * 100);
+      return '<div class="bt-r"><b>ציון ' + k + '</b><div class="dp-bar"><i class="' + (x.avgR >= 0 ? 'pos' : 'neg') + '" style="' + (x.avgR >= 0 ? 'right:50%;' : 'left:50%;') + 'width:' + Math.min(50, Math.abs(x.avgR) * 25) + '%"></i></div><span>' + x.n + ' עסקאות · ' + wr + '% הצלחה · ' + (x.avgR >= 0 ? '+' : '') + num(x.avgR, 2) + 'R' + (x.enough ? '' : ' <em>מדגם קטן</em>') + '</span></div>';
+    }).join('');
+    return '<section class="dp-card"><h3>אמינות הציון בעבר <small>' + esc(r.sym) + ' · יומי</small></h3>' + (rows || '<div class="dp-empty">לא היו מספיק איתותים בהיסטוריה.</div>') +
+      '<div class="dp-foot" style="text-align:right;margin-top:8px">בדיקה על ההיסטוריה של הטיקר הזה בלבד: כניסה לפי הציון, סטופ 1.5 ATR, יעד 2R, עד 20 ימים, בלי עמלות. מדגם מתחת ל-30 עסקאות לא מוכיח כלום. זו לא הבטחה.</div></section>';
   }
   function fundHtml(r) {
     var f = r.fund, s = r.fs;
@@ -327,7 +337,7 @@
     var r = DEEP.res;
     if (!r) { host.innerHTML = DEEP.busy ? '<div class="dp-skel"><i></i><i></i><i></i></div>' : ''; return; }
     var m = r.modes[DEEP.mode];
-    host.innerHTML = heroHtml(r, m) + planHtml(r, m) + gatesHtml(m) + prosRisksHtml(m) + mtfHtml(m) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m) +
+    host.innerHTML = heroHtml(r, m) + planHtml(r, m) + gatesHtml(m) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m) +
       '<div class="dp-foot">נוצר ' + new Date(r.at).toLocaleTimeString('he-IL') + '. כלי עזר אישי ולא ייעוץ השקעות. כל החלטה וכל הוראה באחריותך.</div>';
     $q('#dpOut').querySelectorAll('.dp-card,.dp-hero').forEach(function (el, i) { el.style.animationDelay = (i * 55) + 'ms'; });
     host.querySelectorAll('.dp-chip').forEach(function (b) { b.onclick = function () { DEEP.mode = b.dataset.mode; paint(); }; });
@@ -335,6 +345,8 @@
     var sv = $q('#dpSave'); if (sv) sv.onclick = function () { saveTrade(r, m); };
     var cp = $q('#dpCopy'); if (cp) cp.onclick = function () { copyPlan(r, m); };
     var cb = $q('#dpChartBtn'); if (cb) cb.onclick = function () { goPage('p-today'); onEnter('p-today'); loadChart(r.sym === 'BTC/USD' ? 'BTC' : r.sym); };
+    var cc = $q('#dpCalcBtn'); if (cc) cc.onclick = function () { var pl = m.plan; openCalc({ sym: r.sym.replace('/USD', ''), entry: pl.entry, stop: pl.stop, atr: pl.atr, type: r.sym.indexOf('/') >= 0 ? 'crypto' : 'stock' }); };
+    var lb = $q('#dpLvl'); if (lb) lb.onclick = function () { addLevelsFromAnalysis(r, DEEP.mode); };
     var ab = $q('#dpAi'); if (ab) ab.onclick = function () { aiSummary(r, m); };
     host.querySelectorAll('[data-count]').forEach(function (el) { countUp(el, +el.dataset.count); });
   }
