@@ -1978,7 +1978,7 @@ function firstRun(manual){if(aiKey()&&S.fh)return;if(!manual&&D&&D.vault&&!(S.an
 
 /* ================= ניווט ================= */
 $$('nav button').forEach(b=>b.onclick=()=>navTo(b.dataset.g));$('#gearBtn').onclick=()=>{goPage('p-set')};
-document.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;const t=e.target;if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable))return;const n=/^Digit([1-6])$/.exec(e.code);if(n)navTo(Object.keys(GROUPS)[+n[1]-1])});
+document.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;const t=e.target;if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable))return;const n=/^Digit([1-4])$/.exec(e.code);if(n)navTo(Object.keys(GROUPS)[+n[1]-1])});
 $('#newsTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;$$('#newsTabs button').forEach(x=>x.classList.toggle('on',x===b));newsCat=b.dataset.c;renderNews()};
 
 function renderAll(){renderMovers();renderRules();renderEvList();renderWatch();refreshWatchPrices(true).then(()=>renderToday());renderToday();renderPlans();renderDaily();renderJournal();renderTrades();renderClosed();renderStats();renderNews()}
@@ -2004,7 +2004,7 @@ function renderAll(){renderMovers();renderRules();renderEvList();renderWatch();r
 <script src="heat.js"></script>
 <script src="sync.js"></script>
 <script src="market.js"></script>
-<script src="scan.js"></script><script src="hot.js"></script><script src="wire.js"></script><script src="brief.js"></script>
+<script src="scan.js"></script><script src="hot.js"></script><script src="wire.js"></script><script src="brief.js"></script><script src="ux.js"></script>
 <script src="theme.js"></script>
 </body>
 </html>

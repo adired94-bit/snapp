@@ -222,8 +222,6 @@ section.page.on>.today>*:nth-child(n+6){animation-delay:.2s}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;transition-duration:.001ms!important}}
 
 /* ====================== דף הבית ====================== */
-#homeJump{position:sticky;top:62px;z-index:20;padding:8px 2px;margin:0 0 8px;background:linear-gradient(180deg,rgba(7,9,13,.92),rgba(7,9,13,.6));backdrop-filter:blur(10px)}
-@media(min-width:1100px){#homeJump{display:none}}
 .today3 .card,.tcol .card{padding:12px}
 #liveBox{border:1px solid var(--line);box-shadow:0 18px 40px -22px rgba(0,0,0,.9)}
 .ni{transition:background .2s,transform .2s var(--ease);border-radius:10px}.ni:hover{background:rgba(255,255,255,.025)}
@@ -327,3 +325,19 @@ section.page.on>.today>*:nth-child(n+6){animation-delay:.2s}
 .br-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin:10px 0}.br-c{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px}.br-c small{color:var(--ink2);font-size:12px}.br-c b{font-size:18px;direction:ltr;text-align:right}.br-c span{font-size:13px;font-weight:700;direction:ltr;text-align:right}.br-c i{font-style:normal;font-size:10px;color:var(--ink2);direction:ltr;text-align:right}
 
 .br-ex{font-size:13px;line-height:1.5;color:var(--ink);margin:4px 0 0}.br-ex b{color:var(--ink2);font-weight:700}
+
+/* ===== פשטות ונגישות ===== */
+#qs{display:flex;gap:8px;margin:8px 0 6px}#qs input{flex:1;min-width:0;height:46px;font-size:16px;padding:0 14px;border-radius:12px;background:var(--panel);border:1px solid var(--line);color:var(--ink)}#qs .btn{height:46px;min-width:76px;font-size:16px;font-weight:800}
+.qa-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:6px 0 12px;overflow:visible}
+.qa-strip button{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:14px 14px;min-height:76px;border-radius:14px;background:var(--panel);border:1px solid var(--line);color:var(--ink);text-align:right;font:inherit;border-radius:14px}
+.qa-strip button b{font-size:17px;font-weight:800}.qa-strip button small{font-size:12px;color:var(--ink2);font-weight:400}
+.qa-strip button:first-child{background:linear-gradient(135deg,var(--btc),#e08a00);color:#1a1200;border-color:transparent}.qa-strip button:first-child small{color:rgba(26,18,0,.75)}
+.qa-strip button:hover,.qa-strip button:focus-visible{border-color:var(--btc)}
+@media(max-width:600px){.qa-strip{grid-template-columns:1fr 1fr}.qa-strip button{min-height:70px}}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--btc);outline-offset:2px}
+nav button{font-size:13px;min-height:54px;font-weight:700}nav button svg{width:26px;height:26px}
+.tabs button{min-height:44px;font-size:15px}#subnav button{min-height:44px;font-size:15px}
+.btn,.dp-actions button,.sm-btn,button.small{min-height:44px}
+.check li{min-height:52px}.check input[type=checkbox]{width:24px;height:24px}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+#qs .btn{width:auto!important;flex:0 0 auto;padding:0 22px}#qs input{flex:1 1 auto;width:auto}
