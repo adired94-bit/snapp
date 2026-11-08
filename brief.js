@@ -26,14 +26,16 @@
   }
   async function loadCal(force) {
     if (typeof aiKey !== 'function' || !aiKey()) { ST.cal = { err: 'ליומן מאקרו צריך מפתח בינה בהגדרות.' }; paint(); return; }
-    var hit; try { hit = JSON.parse(localStorage.getItem('adir-brief-cal') || 'null'); } catch (e) { }
-    if (!force && hit && Date.now() - hit.t < 30 * 60e3) { ST.cal = hit; paint(); return; }
+    var hit; try { hit = JSON.parse(localStorage.getItem('adir-brief-cal2') || 'null'); } catch (e) { }
+    if (hit && hit.events && Date.now() - hit.t < 12 * 3600e3) { ST.cal = hit; paint(); }
+    if (!force && hit && Date.now() - hit.t < 30 * 60e3) return;
+    if (ST.busy.c) return;
     ST.busy.c = 1; paint();
     try {
-      var raw = await claude([{ role: 'user', content: 'היום: ' + new Date().toISOString().slice(0, 10) + ' (שעון ישראל עכשיו ' + hm(Date.now()) + ').' }], { system: 'אתה עוזר לסוחר יומי ישראלי. חפש ברשת את אירועי המאקרו וההכרזות החשובים להיום ולמחר בשוק האמריקאי: נתונים כלכליים (תעסוקה, אינפלציה, ריבית), נאומי הפד ונשיא ארה"ב, מכרזי אג"ח, החלטות רגולטוריות, ודוחות גדולים. לכל אירוע: שעה בשעון ישראל אם ידועה, חשיבות (high/medium/low), תחזית וקודם אם ידועים, ומקור עם קישור. חוק ברזל: רק מה שמצאת בפועל ועם קישור. אל תמציא. החזר JSON בלבד: {"events":[{"time":"HH:MM","day":"היום|מחר","title":"","importance":"high|medium|low","forecast":"","previous":"","source":"","url":""}],"summary":"שתי שורות: מה צפוי להזיז את השוק היום"}. עד 10 אירועים.', tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }], max_tokens: 2500, tier: 'smart' });
-      var j = parseJSON(raw); ST.cal = { t: Date.now(), summary: j.summary || '', events: (j.events || []).filter(function (e) { return e && e.title && /^https?:/.test(e.url || ''); }).slice(0, 10) };
-      try { localStorage.setItem('adir-brief-cal', JSON.stringify(ST.cal)); } catch (e) { }
-    } catch (e) { ST.cal = { err: 'חיפוש האירועים נכשל: ' + e.message }; }
+      var raw = await claude([{ role: 'user', content: 'היום: ' + new Date().toISOString().slice(0, 10) + ' (שעון ישראל עכשיו ' + hm(Date.now()) + ').' }], { system: 'אתה עוזר לסוחר יומי ישראלי. חפש ברשת את אירועי המאקרו וההכרזות החשובים להיום ולמחר בשוק האמריקאי: נתונים כלכליים (תעסוקה, אינפלציה, ריבית), נאומי הפד ונשיא ארה"ב, מכרזי אג"ח, החלטות רגולטוריות, ודוחות גדולים. לכל אירוע: שעה בשעון ישראל אם ידועה, חשיבות (high/medium/low), תחזית וקודם אם ידועים, ומקור עם קישור. חוק ברזל: רק מה שמצאת בפועל ועם קישור. אל תמציא. החזר JSON בלבד: {"events":[{"time":"HH:MM","day":"היום|מחר","title":"","importance":"high|medium|low","forecast":"","previous":"","what":"מה זה, במשפט פשוט לסוחר שלא מכיר","impact":"איך זה משפיע על המסחר: אם המספר גבוה מהתחזית מה קורה למדדים, לדולר ולאג\"ח, ואילו מניות או סקטורים מושפעים","source":"","url":""}],"summary":"שתי שורות: מה צפוי להזיז את השוק היום"}. עד 8 אירועים, בלי הקדמה. לכל אירוע חובה למלא what ו-impact בעברית פשוטה וקצרה (עד שני משפטים כל אחד).', tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }], max_tokens: 3200, tier: 'cheap' });
+      var j = parseJSON(raw); ST.cal = { t: Date.now(), summary: j.summary || '', events: (j.events || []).filter(function (e) { return e && e.title && /^https?:/.test(e.url || ''); })  .slice(0, 8) };
+      try { localStorage.setItem('adir-brief-cal2', JSON.stringify(ST.cal)); } catch (e) { }
+    } catch (e) { if (!ST.cal || !ST.cal.events) ST.cal = { err: 'חיפוש האירועים נכשל: ' + e.message }; }
     ST.busy.c = 0; paint();
   }
   function marketHtml() {
@@ -48,19 +50,19 @@
       '<div class="dp-foot" style="text-align:right">מחירים מ-Finnhub, נכון ל-' + hm(ST.qt) + '. בגלל המנוי החינמי המדדים מוצגים דרך קרנות סל שעוקבות אחריהם (למשל SPY במקום S&P 500, VIXY במקום VIX), ולכן אלה לא חוזים עתידיים ולא פרה-מרקט. לחוזים ולפרה-מרקט אמיתיים אפשר להשתמש בכפתור "נתוני שוק" בעמוד הבית.</div>';
   }
   function calHtml() {
-    var c = ST.cal, e = ST.earn, out = '<h4 class="cx-h">אירועי מאקרו והכרזות <small><a href="#" data-brf="cal">רענן</a></small></h4>';
-    if (ST.busy.c) out += '<div class="dp-skel"><i style="height:90px"></i></div><div class="dp-foot">מחפש ברשת…</div>';
+    var c = ST.cal, e = ST.earn, out = watchHtml() + '<h4 class="cx-h">אירועי מאקרו והכרזות <small><a href="#" data-brf="cal">רענן</a></small></h4>';
+    if (ST.busy.c && !(c && c.events)) out += '<div class="dp-skel"><i style="height:90px"></i></div><div class="dp-foot">מחפש ברשת, לוקח כחצי דקה. הדוחות למטה כבר מוכנים.</div>';
     else if (!c) out += '<div class="dp-empty">טוען…</div>';
     else if (c.err) out += '<div class="dp-empty">' + esc(c.err) + '</div>';
     else {
       if (c.summary) out += '<div class="dp-regime"><i></i><b>' + esc(c.summary) + '</b></div>';
-      out += c.events.length ? c.events.map(function (x) { return '<div class="cx-i"><b>' + (x.day ? esc(x.day) + ' ' : '') + (x.time ? esc(x.time) + ' · ' : '') + esc(x.title) + (x.importance === 'high' ? ' <span class="down">●</span>' : '') + '</b>' + ((x.forecast || x.previous) ? '<p>' + (x.forecast ? 'תחזית ' + esc(x.forecast) : '') + (x.forecast && x.previous ? ' · ' : '') + (x.previous ? 'קודם ' + esc(x.previous) : '') + '</p>' : '') + '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.source || 'מקור') + ' ↗</a></div>'; }).join('') : '<div class="dp-empty">לא נמצאו אירועים מתועדים עם מקור.</div>';
-      out += '<div class="dp-foot" style="text-align:right">מחקר ברשת, נכון ל-' + hm(c.t) + '. עלול לטעות. בדוק במקור.</div>';
+      out += c.events.length ? c.events.map(function (x, k) { return '<div class="cx-i"><b>' + (x.day ? esc(x.day) + ' ' : '') + (x.time ? esc(x.time) + ' · ' : '') + esc(x.title) + (x.importance === 'high' ? ' <span class="down">●</span>' : '') + '</b>' + ((x.forecast || x.previous) ? '<p>' + (x.forecast ? 'תחזית ' + esc(x.forecast) : '') + (x.forecast && x.previous ? ' · ' : '') + (x.previous ? 'קודם ' + esc(x.previous) : '') + '</p>' : '') + (x.what ? '<p class="br-ex"><b>מה זה:</b> ' + esc(x.what) + '</p>' : '') + (x.impact ? '<p class="br-ex"><b>איך זה משפיע על המסחר:</b> ' + esc(x.impact) + '</p>' : '') + '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.source || 'מקור') + ' ↗</a> ' + trackBtn('ev' + k, x) + '</div>'; }).join('') : '<div class="dp-empty">לא נמצאו אירועים מתועדים עם מקור.</div>';
+      out += '<div class="dp-foot" style="text-align:right">מחקר ברשת, נכון ל-' + hm(c.t) + (ST.busy.c ? ' · מתעדכן ברקע…' : '') + '. עלול לטעות. בדוק במקור.</div>';
     }
     out += '<h4 class="cx-h">דוחות רבעוניים היום ומחר</h4>';
     if (!S.fh) out += '<div class="dp-empty">צריך מפתח Finnhub.</div>';
     else if (!e) out += '<div class="dp-empty">טוען…</div>';
-    else out += e.rows.length ? '<div class="cx-t"><div class="cx-r cx-th" style="grid-template-columns:1fr 1fr 1fr 1fr"><span>מניה</span><span>יום</span><span>מועד</span><span>צפי רווח</span></div>' + e.rows.map(function (r) { var today = r.date === new Date().toISOString().slice(0, 10); return '<div class="cx-r" style="grid-template-columns:1fr 1fr 1fr 1fr"><span><a href="#" data-brd="' + esc(r.symbol) + '">' + esc(r.symbol) + '</a></span><span>' + (today ? 'היום' : 'מחר') + '</span><span>' + (r.hour === 'bmo' ? 'לפני פתיחה' : r.hour === 'amc' ? 'אחרי סגירה' : r.hour === 'dmh' ? 'בזמן מסחר' : '–') + '</span><span>' + (r.epsEstimate != null ? r.epsEstimate.toFixed(2) : '–') + '</span></div>'; }).join('') + '</div><div class="dp-foot" style="text-align:right">25 הדוחות הגדולים לפי צפי הכנסות. לחיצה על סימול פותחת ניתוח מלא.</div>' : '<div class="dp-empty">אין דוחות מדווחים בתקופה הזאת.</div>';
+    else out += e.rows.length ? '<div class="cx-t"><div class="cx-r cx-th" style="grid-template-columns:1fr 1fr 1fr 1fr"><span>מניה</span><span>יום</span><span>מועד</span><span>צפי רווח</span></div>' + e.rows.map(function (r) { var today = r.date === new Date().toISOString().slice(0, 10); return '<div class="cx-r" style="grid-template-columns:1fr 1fr 1fr 1fr"><span><a href="#" data-brd="' + esc(r.symbol) + '">' + esc(r.symbol) + '</a> ' + trackBtn('er' + r.symbol + r.date, { _er: r }) + '</span><span>' + (today ? 'היום' : 'מחר') + '</span><span>' + (r.hour === 'bmo' ? 'לפני פתיחה' : r.hour === 'amc' ? 'אחרי סגירה' : r.hour === 'dmh' ? 'בזמן מסחר' : '–') + '</span><span>' + (r.epsEstimate != null ? r.epsEstimate.toFixed(2) : '–') + '</span></div>'; }).join('') + '</div><div class="dp-foot" style="text-align:right">25 הדוחות הגדולים לפי צפי הכנסות. לחיצה על סימול פותחת ניתוח מלא.</div>' : '<div class="dp-empty">אין דוחות מדווחים בתקופה הזאת.</div>';
     return out;
   }
   function newsHtml() {
@@ -69,6 +71,52 @@
     out += '<h4 class="cx-h">החדשות האחרונות <small><a href="#" data-brf="news">רענן</a></small></h4>';
     out += W.length ? W.slice(0, 30).map(function (i) { return '<a class="dp-news" href="' + esc(i.link) + '" target="_blank" rel="noopener"><i></i><div><b' + (i.en ? ' dir="ltr"' : '') + '>' + esc((window.__wire.state.tr || {})[i.title] || i.title) + '</b><small>' + esc(i.src) + (i.t ? ' · ' + new Date(i.t).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '') + '</small></div></a>'; }).join('') + '<div class="dp-foot" style="text-align:right">כל החדשות לפי קטגוריה ובתרגום נמצאות בעמוד "חדשות".</div>' : '<div class="dp-empty">טוען חדשות…</div>';
     return out;
+  }
+  /* ---------- מעקב אחרי אירוע: כשהמידע מתפרסם, מקבלים סיכום של מה קרה ומה היה מול התחזית ---------- */
+  var tid = function (id) { return (D.evWatch || []).filter(function (w) { return w.id === id; })[0]; };
+  function trackBtn(id, x) { ST.tr = ST.tr || {}; ST.tr[id] = x; return tid(id) ? '<span class="up" style="font-size:12px">במעקב ✓</span>' : '<a href="#" data-brw="' + esc(id) + '" style="font-size:12px">עקוב</a>'; }
+  function evTime(x) {
+    if (x._er) { var r = x._er, t0 = r.hour === 'bmo' ? nyAt(9, 30) : r.hour === 'dmh' ? nyAt(12, 0) : nyAt(16, 15) + 10 * 6e4; return r.date === new Date().toISOString().slice(0, 10) ? t0 : t0 + 864e5; }
+    var m = /(\d{1,2}):(\d{2})/.exec(x.time || ''), d = new Date(); if (x.day === 'מחר') d.setDate(d.getDate() + 1);
+    if (m) d.setHours(+m[1], +m[2], 0, 0); else return Date.now() + 10 * 6e4;
+    return d.getTime();
+  }
+  function addWatch(id) {
+    var x = ST.tr && ST.tr[id]; if (!x || tid(id)) return; D.evWatch = D.evWatch || [];
+    var er = x._er; D.evWatch.push({ id: id, kind: er ? 'earn' : 'macro', title: er ? 'דוח רבעוני ' + er.symbol : x.title, forecast: er ? (er.epsEstimate != null ? 'צפי רווח ' + er.epsEstimate : '') : (x.forecast || ''), previous: er ? '' : (x.previous || ''), sym: er ? er.symbol : '', ts: evTime(x), next: 0, tries: 0, added: Date.now() });
+    save(); if (typeof Notification !== 'undefined' && Notification.permission === 'default') { try { Notification.requestPermission(); } catch (e) { } }
+    if (typeof toast === 'function') toast('במעקב. כשהמידע יתפרסם תקבל סיכום כאן' + (S.tgT && S.tgC ? ' ובטלגרם' : '') + '. האתר צריך להיות פתוח.'); paint(); setTimeout(tick, 1000);
+  }
+  async function check(w) {
+    w.busy = 1; w.tries = (w.tries || 0) + 1; w.next = Date.now() + 5 * 60e3; paint();
+    var q = w.kind === 'earn' ? 'דוח הרבעון של ' + w.sym + ' (' + w.title + ')' : w.title + (w.forecast ? ' (תחזית ' + w.forecast + ')' : '') + (w.previous ? ' (קודם ' + w.previous + ')' : '');
+    try {
+      var raw = await claude([{ role: 'user', content: 'אירוע: ' + q + '. תאריך: ' + new Date(w.ts).toISOString().slice(0, 10) + '. עכשיו ' + hm(Date.now()) + ' שעון ישראל.' }], { system: 'אתה עוזר לסוחר ישראלי. חפש ברשת האם האירוע כבר פורסם או נאמר, ומה בדיוק היה. אם עדיין לא פורסם, החזר published:false. אסור להמציא: רק מה שמצאת בפועל עם קישור. החזר JSON בלבד: {"published":true,"actual":"המספר או ההכרזה בפועל","forecast":"התחזית","verdict":"מעל התחזית|מתחת לתחזית|בקו התחזית|לא רלוונטי","summary":"שתי עד שלוש שורות בעברית פשוטה: מה קרה ולמה זה חשוב","reaction":"איך השוק או המניה הגיבו עד עכשיו, אם ידוע","source":"","url":""}.', tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 3 }], max_tokens: 1200, tier: 'cheap' });
+      var j = parseJSON(raw);
+      if (j && j.published && /^https?:/.test(j.url || '') && j.summary) { w.result = { actual: j.actual || '', forecast: j.forecast || w.forecast, verdict: j.verdict || '', summary: j.summary, reaction: j.reaction || '', source: j.source || 'מקור', url: j.url, t: Date.now() }; notify(w); }
+      else if (w.tries >= 8) w.result = { failed: 1, summary: 'לא נמצא פרסום מתועד אחרי 8 בדיקות. בדוק ידנית.', t: Date.now() };
+    } catch (e) { if (w.tries >= 8) w.result = { failed: 1, summary: 'הבדיקה נכשלה: ' + e.message, t: Date.now() }; }
+    w.busy = 0; save(); paint();
+  }
+  function notify(w) {
+    var r = w.result, txt = w.title + ': ' + (r.actual ? r.actual + (r.verdict ? ' (' + r.verdict + ')' : '') : '') + '\n' + r.summary + (r.reaction ? '\nתגובת השוק: ' + r.reaction : '');
+    if (typeof toast === 'function') toast(w.title + ' פורסם. הסיכום בתדריך');
+    try { if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification(w.title + ' פורסם', { body: r.summary }); } catch (e) { }
+    if (typeof telegram === 'function') Promise.resolve(telegram('📌 ' + txt + '\n' + r.url)).catch(function () { });
+  }
+  function tick() {
+    var ws = D && D.evWatch; if (!ws || !ws.length || typeof aiKey !== 'function' || !aiKey()) return;
+    var due = ws.filter(function (w) { return !w.result && !w.busy && Date.now() >= w.ts + 2 * 6e4 && Date.now() >= (w.next || 0); })[0];
+    if (due) check(due);
+  }
+  function watchHtml() {
+    var ws = (D.evWatch || []).slice().sort(function (a, b) { return b.ts - a.ts; }); if (!ws.length) return '';
+    return '<h4 class="cx-h">אירועים במעקב</h4>' + ws.map(function (w) {
+      var r = w.result, st = r ? '' : w.busy ? '<span>בודק עכשיו…</span>' : Date.now() < w.ts ? '<span>ממתין לפרסום · ' + new Date(w.ts).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</span>' : '<span>הפרסום צפוי, בודק כל 5 דקות</span>';
+      return '<div class="cx-i"><b>' + esc(w.title) + '</b>' + (w.forecast || w.previous ? '<p>' + (w.forecast ? 'תחזית ' + esc(w.forecast) : '') + (w.forecast && w.previous ? ' · ' : '') + (w.previous ? 'קודם ' + esc(w.previous) : '') + '</p>' : '') + st +
+        (r ? (r.failed ? '<p>' + esc(r.summary) + '</p>' : '<div class="dp-regime ' + (/מעל/.test(r.verdict) ? 'on' : /מתחת/.test(r.verdict) ? 'off' : '') + '"><i></i><b>' + (r.actual ? esc(r.actual) : 'פורסם') + (r.verdict ? ' · ' + esc(r.verdict) : '') + '</b><span>' + esc(r.summary) + (r.reaction ? ' תגובת השוק: ' + esc(r.reaction) : '') + '</span></div><a href="' + esc(r.url) + '" target="_blank" rel="noopener">' + esc(r.source) + ' ↗</a>') : '') +
+        ' <a href="#" data-brx="' + esc(w.id) + '" style="font-size:12px">הסר</a></div>';
+    }).join('');
   }
   /* שעון מסחר: מתי וול סטריט נפתחת בישראל, באיזו שלב אנחנו, וכמה זמן נשאר לכלל 15 הדקות */
   function nyAt(h, m) {
@@ -100,6 +148,8 @@
     $q('#brTabs').querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset.t === ST.tab); });
     host.innerHTML = ST.tab === 'market' ? marketHtml() : ST.tab === 'cal' ? calHtml() : ST.tab === 'clock' ? clockHtml() : newsHtml();
     host.querySelectorAll('[data-brd]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); window.openDeep(a.dataset.brd); }; });
+    host.querySelectorAll('[data-brw]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); addWatch(a.dataset.brw); }; });
+    host.querySelectorAll('[data-brx]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); D.evWatch = (D.evWatch || []).filter(function (w) { return w.id !== a.dataset.brx; }); save(); paint(); }; });
     host.querySelectorAll('[data-brf]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); if (a.dataset.brf === 'cal') loadCal(true); else window.__wire.load(true).then(paint); }; });
   }
   function show(t) { ST.tab = t; clearInterval(ST.iv); if (t === 'clock') ST.iv = setInterval(function () { if ($q('#p-brief.on') && ST.tab === 'clock') paint(); }, 30e3); if (t === 'market') loadMarket(); else if (t === 'cal') { loadEarn(); if (!ST.cal) loadCal(); } else { if (window.__hot) window.__hot.refresh(); if (window.__wire) window.__wire.load(false); setTimeout(paint, 1500); } paint(); }
@@ -112,7 +162,10 @@
     window.__briefShow = function () { var t = new URLSearchParams(location.search).get('tab'); show(t && ['market', 'cal', 'news', 'clock'].indexOf(t) >= 0 && !ST.opened ? t : ST.tab); ST.opened = 1; };
   }
   build();
+  /* טעינה מוקדמת ברקע ביום מסחר, כדי שהיומן יהיה מוכן כשפותחים את הלשונית */
+  setTimeout(function () { var d = new Date().getDay(); if (d > 0 && d < 6 && typeof aiKey === 'function' && aiKey()) loadCal(false); if (S.fh) loadEarn(false); }, 6000);
   GROUPS.morning.push(['p-brief', 'תדריך']); PAGE_GROUP['p-brief'] = 'morning';
   var _e = onEnter; onEnter = function (id) { _e(id); if (id === 'p-brief') window.__briefShow(); };
-  window.__brief = { state: ST, loadMarket: loadMarket, loadEarn: loadEarn };
+  setInterval(tick, 60e3); setTimeout(tick, 9000);
+  window.__brief = { tick: tick, addWatch: addWatch, check: check, tid: tid, state: ST, loadMarket: loadMarket, loadEarn: loadEarn };
 })();

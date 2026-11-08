@@ -325,3 +325,5 @@ section.page.on>.today>*:nth-child(n+6){animation-delay:.2s}
 #ctxRef{color:var(--blue);font-weight:700;margin-inline-start:6px}
 
 .br-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin:10px 0}.br-c{background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:2px}.br-c small{color:var(--ink2);font-size:12px}.br-c b{font-size:18px;direction:ltr;text-align:right}.br-c span{font-size:13px;font-weight:700;direction:ltr;text-align:right}.br-c i{font-style:normal;font-size:10px;color:var(--ink2);direction:ltr;text-align:right}
+
+.br-ex{font-size:13px;line-height:1.5;color:var(--ink);margin:4px 0 0}.br-ex b{color:var(--ink2);font-weight:700}
