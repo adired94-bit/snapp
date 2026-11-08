@@ -75,6 +75,87 @@
     return { score: max ? Math.round(pts / max * 100) : null, notes: notes, buyShare: buyShare, pos52: pos, hi: hi, lo: lo, pe: pe, rg: rg, eg: eg, nm: nm, de: de };
   }
 
+  /* ---------- סווינג: Trend Template (Minervini), חוזק יחסי ומצב שוק ---------- */
+  function sma(a, p, i) { if (i < p - 1 || i >= a.length) return null; var t = 0; for (var k = i - p + 1; k <= i; k++) t += a[k]; return t / p; }
+  function retOver(bars, n) { var i = bars.length - 1; return bars.length > n ? bars[i].c / bars[i - n].c - 1 : null; }
+  function trendTemplate(bars, spy) {
+    if (!bars || bars.length < 210) return { ok: false, msg: 'צריך לפחות 210 נרות יומיים לבדיקה' };
+    var c = bars.map(function (b) { return b.c; }), i = c.length - 1, px = c[i];
+    var s50 = sma(c, 50, i), s150 = sma(c, 150, i), s200 = sma(c, 200, i), s200p = sma(c, 200, i - 22);
+    var look = Math.min(252, bars.length), hi = -Infinity, lo = Infinity;
+    bars.slice(-look).forEach(function (b) { if (b.h > hi) hi = b.h; if (b.l < lo) lo = b.l; });
+    var it = [], add = function (ok, label, detail) { it.push({ ok: ok, label: label, detail: detail }); };
+    add(px > s150 && px > s200, 'המחיר מעל ממוצע 150 וממוצע 200', 'מחיר ' + px.toFixed(2) + ' מול ' + s150.toFixed(2) + ' / ' + s200.toFixed(2));
+    add(s150 > s200, 'ממוצע 150 מעל ממוצע 200', '');
+    add(s200p != null && s200 > s200p, 'ממוצע 200 עולה מזה חודש לפחות', s200p ? (((s200 / s200p - 1) * 100).toFixed(1) + '% בחודש האחרון') : '');
+    add(s50 > s150 && s50 > s200, 'ממוצע 50 מעל 150 ו-200', '');
+    add(px > s50, 'המחיר מעל ממוצע 50', '');
+    add(px >= lo * 1.3, 'לפחות 30% מעל השפל של 52 שבועות', '+' + ((px / lo - 1) * 100).toFixed(0) + '%');
+    add(px >= hi * 0.75, 'עד 25% מתחת לשיא של 52 שבועות', '−' + ((1 - px / hi) * 100).toFixed(0) + '% מהשיא');
+    var rs = null;
+    if (spy && spy.length > 130) {
+      var a6 = retOver(bars, 126), b6 = retOver(spy, 126), a3 = retOver(bars, 63), b3 = retOver(spy, 63);
+      if (a6 != null && b6 != null) { rs = { r6: (a6 - b6) * 100, r3: a3 != null && b3 != null ? (a3 - b3) * 100 : null }; add(rs.r6 > 0, 'חזק מ-SPY ב-6 חודשים', (rs.r6 >= 0 ? '+' : '') + rs.r6.toFixed(1) + ' נק\' מול SPY' + (rs.r3 != null ? ' (3 חודשים: ' + (rs.r3 >= 0 ? '+' : '') + rs.r3.toFixed(1) + ')' : '')); }
+    }
+    if (!rs) add(null, 'חוזק יחסי מול SPY', 'אין נתוני SPY');
+    var known = it.filter(function (x) { return x.ok !== null; }), pass = known.filter(function (x) { return x.ok; }).length;
+    return { ok: true, items: it, pass: pass, total: known.length, rs: rs, hi: hi, lo: lo, s50: s50, s150: s150, s200: s200, verdict: pass >= 7 ? 'ready' : pass >= 5 ? 'partial' : 'no' };
+  }
+  function regimeOf(spy) {
+    if (!spy || spy.length < 210) return null;
+    var c = spy.map(function (b) { return b.c; }), i = c.length - 1, px = c[i], s50 = sma(c, 50, i), s200 = sma(c, 200, i), s200p = sma(c, 200, i - 22);
+    var dist = (px / s200 - 1) * 100, rising = s200 > s200p;
+    /* פס של 3% סביב ממוצע 200 מפחית איתותי שווא (הצלבות סרק) */
+    var st = px > s200 * 1.03 && s50 > s200 && rising ? 'on' : px < s200 * 0.97 ? 'off' : 'mixed';
+    return { state: st, dist: dist, px: px, s50: s50, s200: s200, rising: rising, label: st === 'on' ? 'שוק תומך' : st === 'off' ? 'שוק חלש' : 'שוק מעורב' };
+  }
+
+  /* ---------- יומי: מפת היום (גאפ, PDH/PDL, טווח פתיחה, RVOL לפי שעה) ---------- */
+  var nyFmt = null;
+  function nyMin(t) { if (!nyFmt) nyFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour12: false, hour: '2-digit', minute: '2-digit' }); var p = {}; nyFmt.formatToParts(new Date(t)).forEach(function (x) { p[x.type] = x.value; }); return (+p.hour % 24) * 60 + (+p.minute); }
+  function dayLevels(b5) {
+    if (!b5 || b5.length < 30) return null;
+    var days = {}, order = [];
+    b5.forEach(function (b) { var m = nyMin(b.t); if (m < 570 || m >= 960) return; var d = AT.ind.nyDay(b.t); if (!days[d]) { days[d] = []; order.push(d); } days[d].push({ b: b, m: m }); });
+    var ref = null; for (var k = order.length - 1; k >= 0; k--) { if (days[order[k]].some(function (x) { return x.m >= 570 && x.m < 600; })) { ref = k; break; } }
+    if (ref == null) return null;
+    var T = days[order[ref]], P = ref > 0 ? days[order[ref - 1]] : null;
+    var or = T.filter(function (x) { return x.m < 600; }).map(function (x) { return x.b; });
+    if (or.length < 4) return null;
+    var orh = Math.max.apply(null, or.map(function (b) { return b.h; })), orl = Math.min.apply(null, or.map(function (b) { return b.l; }));
+    var last = T[T.length - 1], res = { date: order[ref], orh: orh, orl: orl, orMid: (orh + orl) / 2, last: last.b.c, lastMin: last.m, complete: last.m >= 955 };
+    if (P) { res.pdh = Math.max.apply(null, P.map(function (x) { return x.b.h; })); res.pdl = Math.min.apply(null, P.map(function (x) { return x.b.l; })); res.pdc = P[P.length - 1].b.c; res.gapPct = (T[0].b.o / res.pdc - 1) * 100; }
+    /* RVOL לפי שעה: נפח מצטבר עד אותה דקה מול ימים קודמים */
+    var cum = function (arr, m) { return arr.reduce(function (a, x) { return x.m <= m ? a + (x.b.v || 0) : a; }, 0); };
+    var prior = order.slice(0, ref).map(function (d) { return cum(days[d], last.m); }).filter(function (v) { return v > 0; });
+    if (prior.length) { var avg = prior.reduce(function (a, b) { return a + b; }, 0) / prior.length, now = cum(T, last.m); res.rvol = avg > 0 ? now / avg : null; res.rvolN = prior.length; }
+    var tp = 0, vv = 0; T.forEach(function (x) { var v = x.b.v > 0 ? x.b.v : 1; tp += (x.b.h + x.b.l + x.b.c) / 3 * v; vv += v; }); res.vwap = vv ? tp / vv : null;
+    return res;
+  }
+  function orbPlan(d) {
+    if (!d) return null; var rg = d.orh - d.orl; if (!(rg > 0)) return null;
+    var long = d.last >= d.orMid, e = long ? d.orh : d.orl, st = long ? d.orl : d.orh;
+    var qty = S.risk > 0 ? Math.floor(S.risk / rg) : 0;
+    return { dir: long ? 'long' : 'short', entry: e, stop: st, t1: long ? e + rg : e - rg, t2: long ? e + 2 * rg : e - 2 * rg, risk: rg, qty: qty };
+  }
+
+  /* ---------- ארוך: בדיקת איכות (ROIC / שולי רווח / FCF / PEG) ---------- */
+  function quality(f) {
+    if (!f || !f.metric) return null; var m = f.metric, it = [];
+    var g = function () { for (var i = 0; i < arguments.length; i++) { var v = m[arguments[i]]; if (v != null && isFinite(v)) return v; } return null; };
+    var add = function (v, ok, label, fmt) { it.push({ ok: v == null ? null : ok(v), label: label, detail: v == null ? 'אין נתון' : fmt(v) }); };
+    var pct = function (v) { return v.toFixed(1) + '%'; };
+    add(g('roiTTM', 'roeTTM'), function (v) { return v >= 15; }, 'תשואה על הון (ROI/ROE) מעל 15%', pct);
+    add(g('operatingMarginTTM'), function (v) { return v >= 15; }, 'שולי רווח תפעולי מעל 15%', pct);
+    add(g('netProfitMarginTTM'), function (v) { return v >= 10; }, 'שולי רווח נקי מעל 10%', pct);
+    var pf = g('pfcfShareTTM'); add(pf != null && pf > 0 ? 100 / pf : null, function (v) { return v >= 4; }, 'תשואת תזרים חופשי (FCF yield) מעל 4%', pct);
+    var pe = g('peTTM', 'peBasicExclExtraTTM'), gr = g('epsGrowth5Y'); add(pe != null && gr != null && gr > 0 && pe > 0 ? pe / gr : null, function (v) { return v <= 1.5; }, 'PEG מתחת ל-1.5', function (v) { return v.toFixed(2); });
+    add(g('totalDebt/totalEquityQuarterly', 'totalDebt/totalEquityAnnual'), function (v) { return v <= 1.5; }, 'חוב להון מתחת ל-1.5', function (v) { return v.toFixed(2); });
+    add(g('revenueGrowth5Y'), function (v) { return v >= 8; }, 'צמיחת הכנסות ב-5 שנים מעל 8% בשנה', pct);
+    var known = it.filter(function (x) { return x.ok !== null; }), pass = known.filter(function (x) { return x.ok; }).length;
+    return { items: it, pass: pass, total: known.length };
+  }
+
   /* ---------- בניית תוכנית ופירוק לאופק ---------- */
   function buildMode(bars, mode, ctx) {
     var an = E.analyzeAll(bars, mode, 70);
@@ -96,12 +177,15 @@
     if (ex.plan && base && base.ok) {
       var p = ex.plan, risk = Math.abs(p.entry - p.stop), long = p.dir === 'long';
       var riskUsd = (S.risk || 0) * sf.factor, qty = risk > 0 && riskUsd > 0 ? Math.floor(riskUsd / risk) : 0;
+      /* תקרת גודל: לא מציעים פוזיציה גדולה מהתיק (כפול המינוף המקסימלי שהגדרת, ברירת מחדל 1) */
+      var maxLev = +S.maxLev > 0 ? +S.maxLev : 1, capped = false;
+      if (S.acct > 0 && p.entry > 0) { var maxQ = Math.floor(S.acct * maxLev / p.entry); if (qty > maxQ) { qty = maxQ; capped = true; } }
       /* מכשולים בדרך ליעד השני: רמות תמיכה והתנגדות שבין הכניסה ליעד */
       var lo = Math.min(p.entry, p.t2), hi = Math.max(p.entry, p.t2);
       var obst = (base.zones.sr || []).filter(function (z) { return z.level > lo && z.level < hi && (long ? z.type === 'resistance' : z.type === 'support'); });
       plan = { dir: p.dir, side: p.side, entry: p.entry, zoneLo: p.entry - 0.25 * base.atr, zoneHi: p.entry + 0.25 * base.atr, stop: p.stop, t1: p.t1, t2: p.t2, atr: base.atr, tf: p.tf,
         rr1: risk > 0 ? Math.abs(p.t1 - p.entry) / risk : null, rr2: risk > 0 ? Math.abs(p.t2 - p.entry) / risk : null, riskPerShare: risk, riskPct: risk / p.entry * 100,
-        qty: qty, riskUsd: qty * risk, posUsd: qty * p.entry, sizeFactor: sf, hypothetical: p.hypothetical, obstacles: obst.slice(0, 3), hold: HOLD[mode], trail: TRAIL[mode] };
+        qty: qty, riskUsd: qty * risk, posUsd: qty * p.entry, sizeFactor: sf, capped: capped, maxLev: maxLev, hypothetical: p.hypothetical, obstacles: obst.slice(0, 3), hold: HOLD[mode], trail: TRAIL[mode] };
     }
     return { mode: mode, an: an, ex: ex, base: base, plan: plan, sf: sf };
   }
@@ -123,8 +207,15 @@
     /* חשיפה מצטברת לקבוצה מתואמת מול הסיכון הפתוח ביומן */
     var grp = AT.groupOf(r.sym), open = 0, tot = 0;
     (D.trades || []).forEach(function (t) { if (t.status === 'open' || t.status === 'active') { var rk = (t.sizing && t.sizing.risk) || 0; tot += rk; if (AT.groupOf(t.ticker) === grp) open += rk; } });
-    var add = plan ? plan.riskUsd : 0, lim = (S.acct || 0) * 0.015;
-    if (S.acct > 0 && grp !== r.sym) ss.items.push({ ok: open + add <= lim + 1e-9, label: 'חשיפה לקבוצה "' + grp + '" בגבול 1.5% מההון', detail: 'סיכון מצטבר $' + Math.round(open + add) + ' מתוך $' + Math.round(lim) });
+    var add = plan ? plan.riskUsd : 0, gl = +S.heatGroup > 0 ? +S.heatGroup : 3, tl = +S.heatTotal > 0 ? +S.heatTotal : 6, lim = (S.acct || 0) * gl / 100, tlim = (S.acct || 0) * tl / 100;
+    if (S.acct > 0 && grp !== r.sym) ss.items.push({ ok: open + add <= lim + 1e-9, label: 'חשיפה לקבוצה "' + grp + '" בגבול ' + gl + '% מההון', detail: 'סיכון מצטבר $' + Math.round(open + add) + ' מתוך $' + Math.round(lim) });
+    if (S.acct > 0) ss.items.push({ ok: tot + add <= tlim + 1e-9, label: 'סך הסיכון הפתוח בגבול ' + tl + '% (חום תיק)', detail: 'מצטבר $' + Math.round(tot + add) + ' מתוך $' + Math.round(tlim) });
+    var rg = r.regime, tt = r.tt;
+    if (m.mode !== 'day') ss.items.push({ ok: rg ? (rg.state === 'on' ? true : rg.state === 'off' ? false : null) : null, label: 'מצב השוק תומך (SPY מעל ממוצע 200)', detail: rg ? rg.label + ' · ' + (rg.dist >= 0 ? '+' : '') + rg.dist.toFixed(1) + '% מממוצע 200' : 'אין נתוני SPY' });
+    if (m.mode === 'swing') ss.items.push({ ok: tt && tt.ok ? (tt.verdict === 'ready' ? true : tt.verdict === 'no' ? false : null) : null, label: 'תבנית מגמה (Trend Template) 7/8 ומעלה', detail: tt && tt.ok ? tt.pass + ' מתוך ' + tt.total : '' });
+    if (m.mode === 'day' && r.day) ss.items.push({ ok: r.day.rvol != null ? r.day.rvol >= 1.5 : null, label: 'נפח יחסי לפי שעה לפחות פי 1.5', detail: r.day.rvol != null ? 'פי ' + r.day.rvol.toFixed(2) + ' (' + r.day.rvolN + ' ימים קודמים)' : 'אין מספיק ימים להשוואה' });
+    ss.failed = ss.items.filter(function (x) { return x.ok === false; }).length; ss.unknown = ss.items.filter(function (x) { return x.ok === null; }).length;
+    ss.ok = ss.failed === 0 && ss.unknown === 0; ss.status = ss.failed ? 'blocked' : ss.unknown ? 'unverified' : 'ready';
     return ss;
   }
 
@@ -159,14 +250,18 @@
         });
       }, Promise.resolve()).then(function () {
         if (!Object.keys(bars).length) { var u = Object.keys(errors).map(function (k) { return errors[k]; }).filter(function (x, j, a) { return a.indexOf(x) === j; }); throw new Error(u.length ? u.slice(0, 2).join(' | ') : 'לא התקבלו נתונים עבור ' + sym); }
+        setMsg('בודק את מצב השוק (SPY)…', 84);
+        var spyP = sym === 'SPY' ? Promise.resolve(bars['1D'] || null) : c.series('SPY', '1day', 300).catch(function () { return null; });
         setMsg('מחשב ניתוח…', 90);
-        return Promise.all([newsP, earnP, fundP, quoteP]);
+        return Promise.all([newsP, earnP, fundP, quoteP, spyP]);
       });
     }).then(function (x) {
       var news = x[0], earn = x[1], fund = x[2], quote = x[3], days = null;
       if (earn && earn.date) { var d = Math.round((Date.parse(earn.date) - Date.now()) / 864e5); if (isFinite(d)) days = d; }
       var price = quote && quote.price ? quote.price : (bars['5m'] && bars['5m'].length ? bars['5m'][bars['5m'].length - 1].c : bars['1D'] && bars['1D'].length ? bars['1D'][bars['1D'].length - 1].c : null);
+      var spy = x[4];
       var res = { sym: sym, bars: bars, errors: errors, news: news, earn: earn, days: days, fund: fund, fs: fundScore(fund, price), quote: quote, price: price, modes: {}, at: Date.now(), ai: {} };
+      res.spy = spy; res.regime = regimeOf(spy); res.tt = trendTemplate(bars['1D'], spy); res.day = dayLevels(bars['5m']); res.orb = orbPlan(res.day); res.q = quality(fund);
       ['day', 'swing', 'long'].forEach(function (m) { var r = buildMode(bars, m, { news: news, days: days }); r.gates = gatesFor(res, r, bars); res.modes[m] = r; });
       try { if (bars['1D'] && bars['1D'].length >= 140) res.bt = E.backtest(bars['1D'], { window: 120, start: 90, horizon: 20, mult: 1.5, rr: 2, cooldown: 3 }); } catch (e) { res.bt = null; }
       DEEP.res = res; setMsg('');
@@ -237,12 +332,13 @@
     if (!p) return '<section class="dp-card"><h3>תוכנית עסקה</h3><div class="dp-empty">הציון ניטרלי (' + m.ex.score + '). אין כיוון מספיק ברור לתוכנית. מחכים לאישור.</div></section>';
     var long = p.dir === 'long', cls = long ? 'long' : 'short';
     var hyp = p.hypothetical ? '<div class="dp-flag">תרחיש מותנה: התנאים לכניסה עוד לא התקיימו. זה מה שיקרה אם יתקיימו.</div>' : '';
+    var capNote = p.capped ? '<div class="dp-flag">הכמות הוגבלה לגודל התיק (מינוף מקסימלי ' + p.maxLev + 'x). הסטופ צפוף, ולכן הסיכון בפועל נמוך מהסיכון שהגדרת. אפשר לשנות מינוף בחום תיק › הגדרת תקרות.</div>' : '';
     var sz = S.risk > 0 ? tile('כמות', p.qty ? p.qty + ' מניות' : '0', 'big', p.sizeFactor.factor < 1 ? 'הוקטן פי ' + p.sizeFactor.factor : '') + tile('סיכון בעסקה', '$' + num(p.riskUsd, 0), 'neg', num(p.riskPct, 2) + '% מהמחיר') + tile('גודל פוזיציה', '$' + num(p.posUsd, 0)) : '<div class="dp-flag">הגדר "סיכון $ לעסקה" בהגדרות כדי לקבל כמות.</div>';
     var obst = p.obstacles.length ? '<div class="dp-obst"><b>מכשולים בדרך ליעד:</b> ' + p.obstacles.map(function (z) { return '$' + px(z.level) + ' (' + (z.type === 'resistance' ? 'התנגדות' : 'תמיכה') + ', ' + z.touches + ' מגעים)'; }).join(' · ') + '</div>' : '';
     return '<section class="dp-card dp-plan ' + cls + '"><h3>תוכנית עסקה · ' + p.side + ' <small>' + MODES[m.mode] + ' · בסיס ' + E.TF_LABEL[p.tf] + ' · ATR $' + px(p.atr) + '</small></h3>' + hyp +
       '<canvas id="dpChart" class="dp-canvas"></canvas>' +
       '<div class="dp-tiles">' + tile('כניסה', '$' + px(p.entry), 'ent', 'אזור $' + px(Math.min(p.zoneLo, p.zoneHi)) + ' – $' + px(Math.max(p.zoneLo, p.zoneHi))) + tile('סטופ לוס', '$' + px(p.stop), 'neg', '−' + num(p.riskPct, 2) + '%') +
-      tile('יעד 1 · 2R', '$' + px(p.t1), 'pos', 'R:R 1:' + num(p.rr1, 1)) + tile('יעד 2 · 3R', '$' + px(p.t2), 'pos', 'R:R 1:' + num(p.rr2, 1)) + sz + '</div>' + obst +
+      tile('יעד 1 · 2R', '$' + px(p.t1), 'pos', 'R:R 1:' + num(p.rr1, 1)) + tile('יעד 2 · 3R', '$' + px(p.t2), 'pos', 'R:R 1:' + num(p.rr2, 1)) + sz + '</div>' + capNote + obst +
       '<div class="dp-rules"><div><b>משך החזקה</b><span>' + p.hold + '</span></div><div><b>ניהול העסקה</b><span>' + p.trail + '</span></div><div><b>ביטול התרחיש</b><span>' + (long ? 'סגירה מתחת ל-$' + px(p.stop) : 'סגירה מעל $' + px(p.stop)) + ', או שהציון מתהפך לכיוון ההפוך.</span></div></div>' +
       '<div class="dp-actions"><button class="btn" id="dpSave">📓 שמור ליומן כעסקה מתוכננת</button><button class="btn ghost" id="dpCopy">⎘ העתק תוכנית</button><button class="btn ghost" id="dpCalcBtn">🧮 מחשבון</button><button class="btn ghost" id="dpChartBtn">📈 גרף</button></div></section>';
   }
@@ -302,6 +398,34 @@
     return '<section class="dp-card"><h3>אמינות הציון בעבר <small>' + esc(r.sym) + ' · יומי</small></h3>' + (rows || '<div class="dp-empty">לא היו מספיק איתותים בהיסטוריה.</div>') +
       '<div class="dp-foot" style="text-align:right;margin-top:8px">בדיקה על ההיסטוריה של הטיקר הזה בלבד: כניסה לפי הציון, סטופ 1.5 ATR, יעד 2R, עד 20 ימים, בלי עמלות. מדגם מתחת ל-30 עסקאות לא מוכיח כלום. זו לא הבטחה.</div></section>';
   }
+  function regimeHtml(r) {
+    var g = r.regime; if (!g) return '';
+    return '<div class="dp-regime ' + g.state + '"><i></i><b>' + g.label + '</b><span>SPY ' + (g.dist >= 0 ? '+' : '') + g.dist.toFixed(1) + '% מממוצע 200' + (g.rising ? ' · ממוצע 200 עולה' : ' · ממוצע 200 לא עולה') + '</span></div>';
+  }
+  function trendHtml(r) {
+    var t = r.tt; if (!t) return '';
+    if (!t.ok) return '<section class="dp-card"><h3>תבנית מגמה לסווינג</h3><div class="dp-empty">' + esc(t.msg) + '</div></section>';
+    var v = t.verdict === 'ready' ? ['ok', 'עומד בתבנית'] : t.verdict === 'partial' ? ['wait', 'עומד חלקית'] : ['no', 'לא עומד'];
+    return '<section class="dp-card"><h3>תבנית מגמה לסווינג <small class="dp-st ' + v[0] + '">' + t.pass + '/' + t.total + ' · ' + v[1] + '</small></h3><ul class="dp-gates">' + t.items.map(function (x) {
+      return '<li class="' + (x.ok === true ? 'ok' : x.ok === false ? 'no' : 'un') + '"><i>' + (x.ok === true ? '✓' : x.ok === false ? '✕' : '?') + '</i><div>' + esc(x.label) + (x.detail ? '<small>' + esc(x.detail) + '</small>' : '') + '</div></li>'; }).join('') + '</ul>' +
+      '<div class="dp-foot" style="text-align:right;margin-top:8px">על פי תבנית המגמה של Minervini כפי שמתוארת במקורות משניים. הסף משתנה בין מקורות. מניות שעברו אותה הן מועמדות, לא הבטחה.</div></section>';
+  }
+  function dayHtml(r) {
+    var d = r.day;
+    if (!d) return '<section class="dp-card"><h3>מפת היום</h3><div class="dp-empty">אין מספיק נרות של 5 דקות מתוך שעות המסחר (9:30 עד 16:00 שעון ניו יורק). כנראה שהשוק סגור או שאין נתוני תוך-יום.</div></section>';
+    var o = r.orb, fm = function (n) { return n == null ? '–' : '$' + px(n); };
+    var tiles = tile('גאפ', d.gapPct != null ? (d.gapPct >= 0 ? '+' : '') + num(d.gapPct, 2) + '%' : '–', d.gapPct != null && Math.abs(d.gapPct) >= 4 ? 'big' : '', Math.abs(d.gapPct || 0) >= 4 ? 'גאפ משמעותי' : '') + tile('נפח יחסי לפי שעה', d.rvol != null ? 'x' + num(d.rvol, 2) : '–', d.rvol >= 2 ? 'pos' : '', d.rvol != null ? 'מול ' + d.rvolN + ' ימים' : 'אין השוואה') +
+      tile('גבוה אתמול (PDH)', fm(d.pdh)) + tile('נמוך אתמול (PDL)', fm(d.pdl)) + tile('טווח פתיחה גבוה', fm(d.orh), 'pos', '30 דקות ראשונות') + tile('טווח פתיחה נמוך', fm(d.orl), 'neg') + tile('VWAP של היום', fm(d.vwap), '', d.last > d.vwap ? 'המחיר מעליו' : 'המחיר מתחתיו');
+    var plan = o ? '<div class="dp-rules"><div><b>תוכנית פריצת פתיחה (ORB) · ' + (o.dir === 'long' ? 'לונג' : 'שורט') + '</b><span>כניסה ' + (o.dir === 'long' ? 'מעל ' : 'מתחת ל-') + fm(o.entry) + ' · סטופ ' + fm(o.stop) + ' · יעד 1 (1R) ' + fm(o.t1) + ' · יעד 2 (2R) ' + fm(o.t2) + (o.qty ? ' · כמות ' + o.qty : '') + '</span></div>' +
+      '<div><b>תנאים לפני כניסה</b><span>אחרי 10:00 שעון ניו יורק · נר סוגר מעבר לטווח, לא רק נוגע · המחיר ' + (o.dir === 'long' ? 'מעל' : 'מתחת ל') + '-VWAP · נפח יחסי לפחות 1.5 · יש סיבה לתנועה (חדשות או דוח). בלי סיבה, מוותרים.</span></div></div>' : '';
+    return '<section class="dp-card"><h3>מפת היום <small>' + esc(d.date) + (d.complete ? ' · יום שלם' : ' · עד ' + Math.floor(d.lastMin / 60) + ':' + ('0' + d.lastMin % 60).slice(-2) + ' ניו יורק') + '</small></h3><div class="dp-tiles">' + tiles + '</div>' + plan + '</section>';
+  }
+  function qualityHtml(r) {
+    var q = r.q; if (!q) return '';
+    return '<section class="dp-card"><h3>בדיקת איכות לטווח ארוך <small class="dp-st ' + (q.pass >= q.total - 1 ? 'ok' : q.pass >= Math.ceil(q.total / 2) ? 'wait' : 'no') + '">' + q.pass + '/' + q.total + '</small></h3><ul class="dp-gates">' + q.items.map(function (x) {
+      return '<li class="' + (x.ok === true ? 'ok' : x.ok === false ? 'no' : 'un') + '"><i>' + (x.ok === true ? '✓' : x.ok === false ? '✕' : '?') + '</i><div>' + esc(x.label) + '<small>' + esc(x.detail) + '</small></div></li>'; }).join('') + '</ul>' +
+      '<div class="dp-foot" style="text-align:right;margin-top:8px">הספים הם היוריסטיקות נפוצות. מקורות שונים חלוקים לגביהם, והם משתנים לפי ענף וריבית. מרווח ביטחון של 30% ומעלה מהערך הפנימי נשאר שיקול שלך.</div></section>';
+  }
   function fundHtml(r) {
     var f = r.fund, s = r.fs;
     if (r.sym.indexOf('/') >= 0) return '<section class="dp-card"><h3>פונדמנטל</h3><div class="dp-empty">נכס קריפטו: אין דוחות כספיים. הניתוח כאן טכני בלבד.</div></section>';
@@ -337,7 +461,7 @@
     var r = DEEP.res;
     if (!r) { host.innerHTML = DEEP.busy ? '<div class="dp-skel"><i></i><i></i><i></i></div>' : ''; return; }
     var m = r.modes[DEEP.mode];
-    host.innerHTML = heroHtml(r, m) + planHtml(r, m) + gatesHtml(m) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m) +
+    host.innerHTML = heroHtml(r, m) + regimeHtml(r) + planHtml(r, m) + gatesHtml(m) + (DEEP.mode === 'day' ? dayHtml(r) : trendHtml(r) + (DEEP.mode === 'long' ? qualityHtml(r) : '')) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m) +
       '<div class="dp-foot">נוצר ' + new Date(r.at).toLocaleTimeString('he-IL') + '. כלי עזר אישי ולא ייעוץ השקעות. כל החלטה וכל הוראה באחריותך.</div>';
     $q('#dpOut').querySelectorAll('.dp-card,.dp-hero').forEach(function (el, i) { el.style.animationDelay = (i * 55) + 'ms'; });
     host.querySelectorAll('.dp-chip').forEach(function (b) { b.onclick = function () { DEEP.mode = b.dataset.mode; paint(); }; });
@@ -417,5 +541,5 @@
   var snap = document.getElementById('snap');
   if (snap && !document.getElementById('deepBtn')) { var b = document.createElement('button'); b.className = 'btn small'; b.id = 'deepBtn'; b.textContent = '🧠 ניתוח מלא'; b.onclick = function () { openDeep(curSym === 'BTC' ? 'BTC/USD' : curSym); }; snap.parentNode.insertBefore(b, snap); }
   build();
-  window.__deep = { E: E, buildMode: buildMode, fundScore: fundScore, state: DEEP, run: run };
+  window.__deep = { trendTemplate: trendTemplate, regimeOf: regimeOf, dayLevels: dayLevels, orbPlan: orbPlan, quality: quality, E: E, buildMode: buildMode, fundScore: fundScore, state: DEEP, run: run };
 })();

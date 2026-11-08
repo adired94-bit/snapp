@@ -260,3 +260,16 @@ section.page.on>.today>*:nth-child(n+6){animation-delay:.2s}
 .lv-main{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.lv-main .tk{font-family:var(--mono);font-size:15px;font-weight:800}.lv-rng{font-family:var(--mono);font-size:13px;direction:ltr}.lv-d{font-size:12px;color:var(--ink2);margin-inline-start:auto}
 .lv-sub{display:flex;justify-content:space-between;align-items:center;margin-top:5px;font-size:11.5px;color:var(--ink2);gap:8px}
 .lv-act{display:flex;gap:2px;flex:0 0 auto}.lv-act button{background:none;border:0;color:var(--ink2);font-size:16px;padding:4px 7px;border-radius:8px;transition:background .2s}.lv-act button:hover{background:rgba(255,255,255,.07)}.lv-act button.off{opacity:.35}
+
+/* מצב שוק */
+.dp-regime{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:-4px 0 12px;padding:8px 13px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-size:12.5px;animation:rise .6s var(--ease) both}
+.dp-regime i{width:9px;height:9px;border-radius:50%;background:var(--btc);box-shadow:0 0 10px var(--btc)}.dp-regime b{font-size:13px}.dp-regime span{color:var(--ink2)}
+.dp-regime.on{border-color:rgba(25,214,138,.4)}.dp-regime.on i{background:var(--up);box-shadow:0 0 10px var(--up)}.dp-regime.on b{color:var(--up)}
+.dp-regime.off{border-color:rgba(255,77,94,.4)}.dp-regime.off i{background:var(--down);box-shadow:0 0 10px var(--down)}.dp-regime.off b{color:var(--down)}
+
+/* חום תיק */
+.ht-l{display:grid;grid-template-columns:90px 1fr;gap:10px;align-items:center;margin-top:10px;font-size:12px;color:var(--ink2)}
+.ht-m{position:relative;height:9px;border-radius:99px;background:var(--panel2);border:1px solid var(--line);overflow:hidden}.ht-m i{position:absolute;right:0;top:0;bottom:0;border-radius:99px;transition:width .8s var(--ease)}.ht-m u{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--ink);opacity:.65}
+.ht-rows{margin-top:12px;display:grid;gap:5px}.ht-rows>b{font-size:12px;letter-spacing:.1em;color:var(--ink2);text-transform:uppercase}
+.ht-r{display:flex;justify-content:space-between;gap:8px;padding:7px 11px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;font-size:13px}.ht-r b{font-family:var(--mono);font-size:12.5px}.ht-r small{color:var(--ink2)}
+.ht-set{margin-top:12px}.ht-set summary{cursor:pointer;color:var(--ink2);font-size:12.5px;font-weight:700}.ht-set .rc-grid{margin-top:10px}
