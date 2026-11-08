@@ -1995,7 +1995,7 @@ function renderAll(){renderMovers();renderRules();renderEvList();renderWatch();r
   document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&SB){const r=await sbGet();if(r&&(r.updatedAt||0)>(D.updatedAt||0)){D={...D,...r};await store.setLocal(D);renderAll();toast('עודכן מהענן')}}});
 })();
 </script>
-<script src="engine.js"></script>
+<script src="lwc.js"></script><script src="engine.js"></script>
 <script src="deep.js"></script>
 <script src="research.js"></script>
 <script src="insights.js"></script>
@@ -2005,7 +2005,7 @@ function renderAll(){renderMovers();renderRules();renderEvList();renderWatch();r
 <script src="heat.js"></script>
 <script src="sync.js"></script>
 <script src="market.js"></script>
-<script src="scan.js"></script><script src="hot.js"></script><script src="wire.js"></script><script src="brief.js"></script><script src="ux.js"></script><script src="pro.js"></script><script src="lib.js"></script><script src="find.js"></script>
+<script src="scan.js"></script><script src="hot.js"></script><script src="wire.js"></script><script src="brief.js"></script><script src="ux.js"></script><script src="pro.js"></script><script src="lib.js"></script><script src="find.js"></script><script src="chart.js"></script>
 <script src="theme.js"></script>
 </body>
 </html>

@@ -3,8 +3,8 @@
 (function () {
   'use strict';
   var $q = function (s) { return document.querySelector(s); };
-  var L = { 'p-morning': 'בית', 'p-brief': 'תדריך', 'p-news': 'חדשות', 'p-smart': 'סריקה', 'p-lvl': 'רמות', 'p-mkt': 'שוק', 'p-deep': 'ניתוח', 'p-lib': 'ניתוחי מניות', 'p-today': 'גרף', 'p-calc': 'מחשבון', 'p-ai': 'מתמונה', 'p-plan': 'תוכניות', 'p-port': 'פוזיציות', 'p-journal': 'יומן', 'p-weekly': 'סיכום שבועי' };
-  var G = { morning: ['p-morning', 'p-brief', 'p-news'], scan: ['p-smart', 'p-lvl', 'p-mkt'], trade: ['p-deep', 'p-lib', 'p-today', 'p-calc', 'p-ai', 'p-plan'], port: ['p-port', 'p-journal', 'p-weekly'] };
+  var L = { 'p-morning': 'בית', 'p-brief': 'תדריך', 'p-news': 'חדשות', 'p-smart': 'סריקה', 'p-lvl': 'רמות', 'p-mkt': 'שוק', 'p-deep': 'ניתוח', 'p-sym': 'מסך מניה', 'p-lib': 'ניתוחי מניות', 'p-today': 'גרף', 'p-calc': 'מחשבון', 'p-ai': 'מתמונה', 'p-plan': 'תוכניות', 'p-port': 'פוזיציות', 'p-journal': 'יומן', 'p-weekly': 'סיכום שבועי' };
+  var G = { morning: ['p-morning', 'p-brief', 'p-news'], scan: ['p-smart', 'p-lvl', 'p-mkt'], trade: ['p-deep', 'p-sym', 'p-lib', 'p-today', 'p-calc', 'p-ai', 'p-plan'], port: ['p-port', 'p-journal', 'p-weekly'] };
   var NAV = { morning: 'בית', scan: 'סריקה', trade: 'ניתוח', port: 'תיק' };
   Object.keys(GROUPS).forEach(function (k) { delete GROUPS[k]; });
   Object.keys(PAGE_GROUP).forEach(function (k) { delete PAGE_GROUP[k]; });

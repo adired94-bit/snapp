@@ -583,7 +583,7 @@
     var al = $q('#dpAlert'); if (al) al.onclick = function () { if (window.__pro) window.__pro.alertsFor(r, m); };
     var wb = $q('#dpWeigh'); if (wb) wb.onclick = function () { weigh(r); };
     var cp = $q('#dpCopy'); if (cp) cp.onclick = function () { copyPlan(r, m); };
-    var cb = $q('#dpChartBtn'); if (cb) cb.onclick = function () { goPage('p-today'); onEnter('p-today'); loadChart(r.sym === 'BTC/USD' ? 'BTC' : r.sym); };
+    var cb = $q('#dpChartBtn'); if (cb) cb.onclick = function () { if (window.openSym) return window.openSym(r.sym.replace('/USD', '')); goPage('p-today'); onEnter('p-today'); loadChart(r.sym === 'BTC/USD' ? 'BTC' : r.sym); };
     if (window.DeepCtx) DeepCtx.bind();
     var cc = $q('#dpCalcBtn'); if (cc) cc.onclick = function () { var pl = m.plan; openCalc({ sym: r.sym.replace('/USD', ''), entry: pl.entry, stop: pl.stop, atr: pl.atr, type: r.sym.indexOf('/') >= 0 ? 'crypto' : 'stock' }); };
     var lb = $q('#dpLvl'); if (lb) lb.onclick = function () { addLevelsFromAnalysis(r, DEEP.mode); };
