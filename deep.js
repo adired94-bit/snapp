@@ -51,9 +51,20 @@
     return Promise.all([get(b + '/stock/profile2?symbol=' + s + t), get(b + '/stock/metric?symbol=' + s + '&metric=all' + t), get(b + '/stock/recommendation?symbol=' + s + t)])
       .then(function (r) { return { profile: r[0] || {}, metric: (r[1] && r[1].metric) || {}, rec: Array.isArray(r[2]) && r[2].length ? r[2][0] : null }; });
   };
+  var PC = (function () {
+    var m = {}, K = 'adir-c|';
+    return {
+      get: function (k) { var e = m[k]; if (e) { if (Date.now() > e.exp) delete m[k]; else return e.v; } if (k.indexOf('ts|') !== 0) return undefined; try { var r = JSON.parse(localStorage.getItem(K + k) || 'null'); if (r && Date.now() < r.exp) { m[k] = r; return r.v; } } catch (x) { } return undefined; },
+      set: function (k, v, ttl) {
+        var e = { v: v, exp: Date.now() + ttl }; m[k] = e; if (k.indexOf('ts|') !== 0) return;
+        try { localStorage.setItem(K + k, JSON.stringify(e)); } catch (x) { try { Object.keys(localStorage).filter(function (q) { return q.indexOf(K) === 0; }).forEach(function (q) { localStorage.removeItem(q); }); localStorage.setItem(K + k, JSON.stringify(e)); } catch (y) { } }
+        try { var ks = Object.keys(localStorage).filter(function (q) { return q.indexOf(K) === 0; }); if (ks.length > 26) ks.map(function (q) { var r = {}; try { r = JSON.parse(localStorage.getItem(q)); } catch (z) { } return [q, r && r.exp || 0]; }).sort(function (a, b) { return a[1] - b[1]; }).slice(0, ks.length - 26).forEach(function (x) { localStorage.removeItem(x[0]); }); } catch (z) { }
+      }
+    };
+  })();
   function client() {
     var fp = (S.td || '') + '|' + (S.fh || '');
-    if (!DEEP.client || DEEP.keyFp !== fp) { DEEP.client = new DATA.Client({ twelveKey: S.td, finnhubKey: S.fh }); DEEP.keyFp = fp; }
+    if (!DEEP.client || DEEP.keyFp !== fp) { DEEP.client = new DATA.Client({ twelveKey: S.td, finnhubKey: S.fh, cache: PC, limiter: window.__tdLimiter || undefined, fhLimiter: window.__fhLimiter || undefined, fetch: window.__origFetch || undefined }); DEEP.keyFp = fp; DEEP.client.onRetry = function (n) { try { setMsg('ספק הנתונים הגביל את הקצב. ממתין כדקה ומנסה שוב (' + n + ' מתוך 3)…'); } catch (e) { } };  }
     return DEEP.client;
   }
   var hasData = function () { return !!(S.td || S.fh); };
@@ -311,6 +322,9 @@
     var resolve = looks ? Promise.resolve(q.toUpperCase()) : c.search(q).then(function (r) { if (!r.length) throw new Error('לא נמצא נכס בשם "' + q + '"'); return r[0].symbol; });
     var sym, bars = {}, errors = {};
     return resolve.then(function (s) {
+      var IDX = { SPX: 'SPY', '^SPX': 'SPY', NDX: 'QQQ', '^NDX': 'QQQ', IXIC: 'QQQ', COMP: 'QQQ', DJI: 'DIA', DJIA: 'DIA', '^DJI': 'DIA', RUT: 'IWM', '^RUT': 'IWM', VIX: 'VIXY', '^VIX': 'VIXY', SOX: 'SMH' };
+      DEEP.alias = IDX[String(s).toUpperCase()] ? String(s).toUpperCase() + ' הוא מדד, ולכן מנותחת קרן הסל שעוקבת אחריו: ' + IDX[String(s).toUpperCase()] : '';
+      if (DEEP.alias) s = IDX[String(s).toUpperCase()];
       sym = s === 'BTC' ? 'BTC/USD' : s; DEEP.sym = sym;
       var crypto = sym.indexOf('/') >= 0;
       var newsP = !crypto && S.fh ? c.newsAny(sym).catch(function () { return null; }) : Promise.resolve(null);
@@ -320,7 +334,7 @@
       var i = 0;
       return FETCH_TFS.reduce(function (chain, tf) {
         return chain.then(function () {
-          setMsg('טוען ' + sym + ' · ' + E.TF_LABEL[tf] + ' (' + (i + 1) + '/' + FETCH_TFS.length + ')', 8 + Math.round(i / FETCH_TFS.length * 70));
+          setMsg('טוען ' + sym + ' · ' + E.TF_LABEL[tf] + ' (' + (i + 1) + '/' + FETCH_TFS.length + ')' + (i === 0 ? ' · בפעם הראשונה לוקח כדקה בגלל מגבלת הקצב החינמית של ספק הנתונים, ובפעם הבאה יהיה מהיר' : ''), 8 + Math.round(i / FETCH_TFS.length * 70));
           return c.series(sym, E.TF_INTERVAL[tf], tf === '6M' ? 600 : 300).then(function (b) { bars[tf] = tf === '6M' ? E.halfYear(b) : b; }).catch(function (e) { errors[tf] = e.message; }).then(function () { i++; });
         });
       }, Promise.resolve()).then(function () {
@@ -559,7 +573,8 @@
     var m = r.modes[DEEP.mode];
     var data = (window.DeepCtx ? DeepCtx.html(r) : '') + (DEEP.mode === 'day' ? dayHtml(r) : trendHtml(r) + (DEEP.mode === 'long' ? qualityHtml(r) : '')) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m);
     var wt = r.weighed ? heroHtml(r, m) + regimeHtml(r) + uniHtml(m) + planHtml(r, m) + gatesHtml(m) : headHtml(r) + regimeHtml(r) + weighHtml(r);
-    host.innerHTML = wt + data +
+    var alNote = DEEP.alias && DEEP.alias.indexOf(r.sym) >= 0 ? '<div class="dp-flag">' + esc(DEEP.alias) + '</div>' : '';
+    host.innerHTML = alNote + wt + data +
       '<div class="dp-foot">נוצר ' + new Date(r.at).toLocaleTimeString('he-IL') + '. כלי עזר אישי ולא ייעוץ השקעות. כל החלטה וכל הוראה באחריותך.</div>';
     $q('#dpOut').querySelectorAll('.dp-card,.dp-hero').forEach(function (el, i) { el.style.animationDelay = (i * 55) + 'ms'; });
     host.querySelectorAll('.dp-chip').forEach(function (b) { b.onclick = function () { DEEP.mode = b.dataset.mode; paint(); }; });

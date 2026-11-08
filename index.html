@@ -346,6 +346,7 @@ body.demo header{margin-top:22px}
   .trade .th b{font-size:17px}
 }
 </style>
+<script src="net.js"></script>
 <link rel="stylesheet" href="theme.css">
 </head>
 <body>
@@ -887,7 +888,7 @@ async function fetchPrices(symbols){
     }catch(e){}
   }else if(stocks.length){priceErr='אין מפתח מחירים – הוסף Finnhub בהגדרות'}
   // גיבוי: מה שלא חזר מ-Finnhub (מכסה/תקלה) – מ-Twelve Data, עד 8
-  const miss=stocks.filter(x=>!out[x]).slice(0,8);
+  const miss=stocks.filter(x=>!out[x]).slice(0,2);
   if(miss.length&&S.td){try{const r=await fetch(`https://api.twelvedata.com/quote?symbol=${miss.join(',')}&apikey=${S.td}`);const j=await r.json();const rows=miss.length===1?{[miss[0]]:j}:j;
     for(const sym of miss){const q=rows[sym];if(q&&q.close)out[sym]={price:+q.close,chg:+q.percent_change,high:+q.high,low:+q.low,prev:+q.previous_close,open:q.is_market_open!==false,ts:q.timestamp,src:'td'}}}catch(e){}}
   for(const k in out){qAt[k.replace('/USD','')]=Date.now()}Object.assign(LIVE,out); return out;

@@ -890,15 +890,18 @@
     this.fhBase = opts.fhBase || 'https://finnhub.io/api/v1';
     this.calls = 0;
   }
-  Client.prototype._json = function (url, limiter) {
-    var self = this;
+  Client.prototype._json = function (url, limiter, attempt) {
+    var self = this; attempt = attempt || 0;
     if (!this.fetch) return Promise.reject(new Error('אין fetch בסביבה'));
     return (limiter || this.limiter).acquire().then(function () {
       self.calls++;
       return self.fetch(url);
     }).then(function (r) {
       if (!r.ok && r.status !== 200) {
-        if (r.status === 429) throw new Error('חריגה ממגבלת קצב (429)');
+        if (r.status === 429) {
+          if (attempt < 3) { var lm = limiter || self.limiter; lm.q = []; for (var i = 0; i < lm.max; i++) lm.q.push(lm.now()); if (self.onRetry) try { self.onRetry(attempt + 1); } catch (e) { } return self._json(url, limiter, attempt + 1); }
+          throw new Error('חריגה ממגבלת קצב (429)');
+        }
         if (r.status === 401 || r.status === 403) throw new Error('מפתח API לא תקין (' + r.status + ')');
         throw new Error('שגיאת שרת ' + r.status);
       }
