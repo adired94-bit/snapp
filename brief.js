@@ -46,8 +46,8 @@
     var mood = !ok ? '' : up === ok ? 'המדדים הראשיים בעלייה: אווירה חיובית.' : up === 0 ? 'המדדים הראשיים בירידה: אווירה שלילית.' : 'המדדים מעורבים.';
     var vix = by.VIXY && by.VIXY.dp > 3 ? ' הפחד (VIXY) עולה.' : by.VIXY && by.VIXY.dp < -3 ? ' הפחד (VIXY) יורד.' : '';
     return (mood ? '<div class="dp-regime ' + (up === ok ? 'on' : up === 0 ? 'off' : '') + '"><i></i><b>' + mood + '</b><span>' + vix + '</span></div>' : '') +
-      '<div class="br-grid">' + ST.quotes.map(function (x) { return '<div class="br-c"><small>' + esc(x.n) + '</small><b>' + (x.c ? x.c.toFixed(2) : '–') + '</b><span class="' + cls(x.dp) + '">' + pc(x.dp) + '</span><i>' + x.s + '</i></div>'; }).join('') + '</div>' +
-      '<div class="dp-foot" style="text-align:right">מחירים מ-Finnhub, נכון ל-' + hm(ST.qt) + '. בגלל המנוי החינמי המדדים מוצגים דרך קרנות סל שעוקבות אחריהם (למשל SPY במקום S&P 500, VIXY במקום VIX), ולכן אלה לא חוזים עתידיים ולא פרה-מרקט. לחוזים ולפרה-מרקט אמיתיים אפשר להשתמש בכפתור "נתוני שוק" בעמוד הבית.</div>';
+      '<div class="br-grid">' + ST.quotes.map(function (x) { return '<div class="br-c"><small>' + esc(x.n) + '</small><span class="' + cls(x.dp) + '" style="font-size:20px">' + pc(x.dp) + '</span><b style="font-size:14px;color:var(--ink2)">' + (x.c ? '$' + x.c.toFixed(2) : '–') + '</b><i>מחיר הקרן ' + x.s + '</i></div>'; }).join('') + '</div>' +
+      '<div class="dp-foot" style="text-align:right">מחירים מ-Finnhub, נכון ל-' + hm(ST.qt) + '. הכרטיסים מציגים קודם כל את השינוי היומי באחוזים, שכמעט זהה לשינוי במדד עצמו. המספר הקטן הוא מחיר קרן הסל שעוקבת אחרי המדד (SPY עוקבת אחרי S&P 500 וכן הלאה), ולכן הוא לא רמת המדד עצמו. אלה גם לא חוזים עתידיים ולא פרה-מרקט.</div>';
   }
   function calHtml() {
     var c = ST.cal, e = ST.earn, out = watchHtml() + '<h4 class="cx-h">אירועי מאקרו והכרזות <small><a href="#" data-brf="cal">רענן</a></small></h4>';
