@@ -216,7 +216,7 @@
     if (S.acct > 0) ss.items.push({ ok: tot + add <= tlim + 1e-9, label: 'סך הסיכון הפתוח בגבול ' + tl + '% (חום תיק)', detail: 'מצטבר $' + Math.round(tot + add) + ' מתוך $' + Math.round(tlim) });
     var rg = r.regime, tt = r.tt;
     if (m.mode !== 'day') ss.items.push({ ok: rg ? (rg.state === 'on' ? true : rg.state === 'off' ? false : null) : null, label: 'מצב השוק תומך (SPY מעל ממוצע 200)', detail: rg ? rg.label + ' · ' + (rg.dist >= 0 ? '+' : '') + rg.dist.toFixed(1) + '% מממוצע 200' : 'אין נתוני SPY' });
-    if (m.mode === 'swing') ss.items.push({ ok: tt && tt.ok ? (tt.verdict === 'ready' ? true : tt.verdict === 'no' ? false : null) : null, label: 'תבנית מגמה (Trend Template) 7/8 ומעלה', detail: tt && tt.ok ? tt.pass + ' מתוך ' + tt.total : '' });
+    if (m.mode === 'swing') ss.items.push({ ok: tt && tt.ok ? (tt.verdict === 'ready' ? true : tt.verdict === 'no' ? false : null) : null, label: 'תבנית מגמה 7/8 ומעלה', detail: tt && tt.ok ? tt.pass + ' מתוך ' + tt.total : '' });
     if (m.mode === 'day' && r.day) ss.items.push({ ok: r.day.rvol != null ? r.day.rvol >= 1.5 : null, label: 'נפח יחסי לפי שעה לפחות פי 1.5', detail: r.day.rvol != null ? 'פי ' + r.day.rvol.toFixed(2) + ' (' + r.day.rvolN + ' ימים קודמים)' : 'אין מספיק ימים להשוואה' });
     ss.failed = ss.items.filter(function (x) { return x.ok === false; }).length; ss.unknown = ss.items.filter(function (x) { return x.ok === null; }).length;
     ss.ok = ss.failed === 0 && ss.unknown === 0; ss.status = ss.failed ? 'blocked' : ss.unknown ? 'unverified' : 'ready';
@@ -268,7 +268,7 @@
       res.spy = spy; res.regime = regimeOf(spy); res.tt = trendTemplate(bars['1D'], spy); res.day = dayLevels(bars['5m']); res.orb = orbPlan(res.day); res.q = quality(fund);
       ['day', 'swing', 'long'].forEach(function (m) { var r = buildMode(bars, m, { news: news, days: days }); r.gates = gatesFor(res, r, bars); res.modes[m] = r; });
       try { if (bars['1D'] && bars['1D'].length >= 140) res.bt = E.backtest(bars['1D'], { window: 120, start: 90, horizon: 20, mult: 1.5, rr: 2, cooldown: 3 }); } catch (e) { res.bt = null; }
-      DEEP.res = res; setMsg('');
+      DEEP.res = res; setMsg(''); if (window.DeepCtx) DeepCtx.start(res);
     }).catch(function (e) { DEEP.res = null; setMsg('שגיאה: ' + e.message); })
       .then(function () { DEEP.busy = false; paint(); });
   }
@@ -465,7 +465,7 @@
     var r = DEEP.res;
     if (!r) { host.innerHTML = DEEP.busy ? '<div class="dp-skel"><i></i><i></i><i></i></div>' : ''; return; }
     var m = r.modes[DEEP.mode];
-    host.innerHTML = heroHtml(r, m) + regimeHtml(r) + planHtml(r, m) + gatesHtml(m) + (DEEP.mode === 'day' ? dayHtml(r) : trendHtml(r) + (DEEP.mode === 'long' ? qualityHtml(r) : '')) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m) +
+    host.innerHTML = heroHtml(r, m) + regimeHtml(r) + planHtml(r, m) + gatesHtml(m) + (window.DeepCtx ? DeepCtx.html(r) : '') + (DEEP.mode === 'day' ? dayHtml(r) : trendHtml(r) + (DEEP.mode === 'long' ? qualityHtml(r) : '')) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m) +
       '<div class="dp-foot">נוצר ' + new Date(r.at).toLocaleTimeString('he-IL') + '. כלי עזר אישי ולא ייעוץ השקעות. כל החלטה וכל הוראה באחריותך.</div>';
     $q('#dpOut').querySelectorAll('.dp-card,.dp-hero').forEach(function (el, i) { el.style.animationDelay = (i * 55) + 'ms'; });
     host.querySelectorAll('.dp-chip').forEach(function (b) { b.onclick = function () { DEEP.mode = b.dataset.mode; paint(); }; });
@@ -473,6 +473,7 @@
     var sv = $q('#dpSave'); if (sv) sv.onclick = function () { saveTrade(r, m); };
     var cp = $q('#dpCopy'); if (cp) cp.onclick = function () { copyPlan(r, m); };
     var cb = $q('#dpChartBtn'); if (cb) cb.onclick = function () { goPage('p-today'); onEnter('p-today'); loadChart(r.sym === 'BTC/USD' ? 'BTC' : r.sym); };
+    if (window.DeepCtx) DeepCtx.bind();
     var cc = $q('#dpCalcBtn'); if (cc) cc.onclick = function () { var pl = m.plan; openCalc({ sym: r.sym.replace('/USD', ''), entry: pl.entry, stop: pl.stop, atr: pl.atr, type: r.sym.indexOf('/') >= 0 ? 'crypto' : 'stock' }); };
     var lb = $q('#dpLvl'); if (lb) lb.onclick = function () { addLevelsFromAnalysis(r, DEEP.mode); };
     var ab = $q('#dpAi'); if (ab) ab.onclick = function () { aiSummary(r, m); };
@@ -503,10 +504,10 @@
   async function aiSummary(r, m) {
     var b = $q('#dpAi'); if (b) { b.disabled = true; b.textContent = 'מסכם…'; }
     var data = { symbol: r.sym, horizon: MODES[m.mode], score: m.ex.score, stance: m.ex.stance, headline: m.ex.headline, plan: m.plan && { side: m.plan.side, entry: m.plan.entry, stop: m.plan.stop, tp1: m.plan.t1, tp2: m.plan.t2, rr1: m.plan.rr1, qty: m.plan.qty, hypothetical: m.plan.hypothetical },
-      pros: m.ex.pros, risks: m.ex.risks, gates: m.gates.items.map(function (x) { return { label: x.label, ok: x.ok }; }), fundamentals: r.fs && { score: r.fs.score, notes: r.fs.notes.map(function (n) { return n.t; }) }, daysToEarnings: r.days, newsMood: r.news && r.news.label };
+      pros: m.ex.pros, risks: m.ex.risks, gates: m.gates.items.map(function (x) { return { label: x.label, ok: x.ok }; }), fundamentals: r.fs && { score: r.fs.score, notes: r.fs.notes.map(function (n) { return n.t; }) }, daysToEarnings: r.days, newsMood: r.news && r.news.label, context: r.ctx && r.ctx.ai && !r.ctx.ai.err ? { bias: r.ctx.ai.bias, reason: r.ctx.ai.bias_reason, macro: (r.ctx.ai.macro || []).map(function (x) { return x.point; }), sector: (r.ctx.ai.sector || []).map(function (x) { return x.point; }), company: (r.ctx.ai.company || []).map(function (x) { return x.point; }), analysts: (r.ctx.ai.analysts || []).map(function (x) { return x.point; }), events: (r.ctx.ai.events || []).map(function (x) { return x.point; }) } : null };
     try {
       var out = await claude([{ role: 'user', content: 'נתוני הניתוח (JSON):\n' + JSON.stringify(data) }], { tier: 'cheap', max_tokens: 700,
-        system: 'אתה מסביר ניתוח מסחר בעברית פשוטה וקצרה. השתמש רק במספרים ובעובדות שבנתונים. אסור להמציא מחירים, יעדים או עובדות. מבנה: משפט פתיחה עם ההחלטה, אחר כך "למה" ב-3 נקודות, אחר כך "מה יבטל את התרחיש", ובסוף "מה לעשות עכשיו". בלי סימני עיצוב מיוחדים ובלי כותרות.' });
+        system: 'אתה מסביר ניתוח מסחר בעברית פשוטה וקצרה. השתמש רק במספרים ובעובדות שבנתונים. אם יש שדה context, הזכר בקצרה את המאקרו, הסקטור והחדשות שבו. אסור להמציא מחירים, יעדים או עובדות. מבנה: משפט פתיחה עם ההחלטה, אחר כך "למה" ב-3 נקודות, אחר כך "מה יבטל את התרחיש", ובסוף "מה לעשות עכשיו". בלי סימני עיצוב מיוחדים ובלי כותרות.' });
       r.ai[m.mode] = out;
     } catch (e) { toast('הסיכום נכשל: ' + e.message); }
     paint();
@@ -545,5 +546,5 @@
   var snap = document.getElementById('snap');
   if (snap && !document.getElementById('deepBtn')) { var b = document.createElement('button'); b.className = 'btn small'; b.id = 'deepBtn'; b.textContent = 'ניתוח'; b.onclick = function () { openDeep(curSym === 'BTC' ? 'BTC/USD' : curSym); }; snap.parentNode.insertBefore(b, snap); }
   build();
-  window.__deep = { getClient: client, trendTemplate: trendTemplate, regimeOf: regimeOf, dayLevels: dayLevels, orbPlan: orbPlan, quality: quality, E: E, buildMode: buildMode, fundScore: fundScore, state: DEEP, run: run };
+  window.__deep = { repaint: function () { paint(); }, getClient: client, trendTemplate: trendTemplate, regimeOf: regimeOf, dayLevels: dayLevels, orbPlan: orbPlan, quality: quality, E: E, buildMode: buildMode, fundScore: fundScore, state: DEEP, run: run };
 })();

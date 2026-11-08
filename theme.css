@@ -314,3 +314,12 @@ section.page.on>.today>*:nth-child(n+6){animation-delay:.2s}
 
 .sc-main{padding:16px}.sc-opt{margin-top:12px;display:grid;gap:10px}.sc-diag{display:grid;gap:8px;margin-top:2px}
 .sc-hot{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0 2px}.sc-hot span{padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:700;color:var(--btc);border:1px solid rgba(255,176,32,.4);background:rgba(255,176,32,.08)}
+
+/* מה קורה סביב המניה */
+.cx-h{margin:14px 0 6px;font-size:12px;letter-spacing:.1em;color:var(--btc);font-weight:800;text-transform:uppercase}
+.cx-i{padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)}.cx-i:last-of-type{border-bottom:0}
+.cx-i b{display:block;font-size:13.5px;line-height:1.45;font-weight:700}.cx-i p{font-size:12.5px;color:var(--ink2);line-height:1.5;margin:3px 0 0}
+.cx-i a{display:inline-block;margin-top:4px;font-size:11.5px;font-weight:700;color:var(--blue);text-decoration:none}.cx-i a:hover{text-decoration:underline}
+.cx-t{display:grid;gap:4px}.cx-r{display:grid;grid-template-columns:1.1fr 1fr 1fr 1fr;gap:6px;padding:7px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;font-size:12.5px;font-family:var(--mono)}
+.cx-r span:first-child{font-weight:800}.cx-th{background:none;border:0;color:var(--ink2);font-family:Heebo,sans-serif;font-size:11px;font-weight:700}.cx-r.me{border-color:rgba(255,176,32,.5);background:linear-gradient(90deg,rgba(255,176,32,.1),transparent)}.cx-med{color:var(--ink2)}
+#ctxRef{color:var(--blue);font-weight:700;margin-inline-start:6px}
