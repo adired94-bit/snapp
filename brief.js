@@ -207,5 +207,5 @@
   GROUPS.morning.push(['p-brief', 'תדריך']); PAGE_GROUP['p-brief'] = 'morning';
   var _e = onEnter; onEnter = function (id) { _e(id); if (id === 'p-brief') window.__briefShow(); };
   setInterval(tick, 60e3); setTimeout(tick, 9000);
-  window.__brief = { tick: tick, addWatch: addWatch, check: check, tid: tid, state: ST, loadMarket: loadMarket, loadEarn: loadEarn };
+  window.__brief = { loadRadar: loadRadar, tick: tick, addWatch: addWatch, check: check, tid: tid, state: ST, loadMarket: loadMarket, loadEarn: loadEarn };
 })();

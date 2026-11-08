@@ -9,8 +9,8 @@
   function scanPicks() { try { var r = window.__scan.state.report || JSON.parse(localStorage.getItem('adir-scan3') || 'null'); var a = (r && (r.picks || r.rows || r.top)) || []; return a.map(function (x) { return x.sym; }).filter(Boolean).slice(0, 6); } catch (e) { return []; } }
   function list() { var base = cache && cache.syms && cache.syms.length ? cache.syms : DEF, p = scanPicks(); return Array.from(new Set(p.concat(base))).slice(0, 18); }
   var busy = false;
-  async function refresh() {
-    if (busy || !S.fh) return; if (cache && Date.now() - cache.t < TTL) return; busy = true;
+  async function refresh(force) {
+    if (busy || !S.fh) return; if (!force && cache && Date.now() - cache.t < TTL) return; busy = true;
     try {
       var u = universe(), rows = [];
       for (var i = 0; i < u.length; i++) {
