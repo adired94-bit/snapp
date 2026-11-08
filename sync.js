@@ -12,7 +12,7 @@
   function hint(st, msg) {
     if (st === 401 || st === 403) return 'ההרשאות ב-Supabase חוסמות את הפעולה (RLS או מפתח לא תקין).';
     if (st === 404) return 'הטבלה trading_journal לא קיימת ב-Supabase.';
-    if (st === 0 || st == null) return 'אין חיבור לענן: חסימת רשת, VPN או חסם פרסומות. (' + (msg || '') + ')';
+    if (st === 0 || st == null) return 'אין חיבור לענן. הסיבה הסבירה ביותר: פרויקט Supabase הושהה (קורה בחבילה החינמית אחרי כשבוע בלי שימוש) וצריך לשחזר אותו בלוח הבקרה של Supabase. סיבות אחרות: חסם פרסומות, VPN או חסימת רשת. (' + (msg || '') + ')';
     return 'הענן החזיר ' + st + (msg ? ': ' + String(msg).slice(0, 100) : '');
   }
   var tell = function (r) { return r && r.ok ? 'תקין' : hint(r && r.status, r && r.msg); };
