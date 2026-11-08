@@ -307,7 +307,7 @@
     await save(); renderPlans(); renderTrades(); toast('נשמר ביומן כעסקה מתוכננת');
   }
   async function saveRow(r) {
-    var p = r.plan; if (!p.qty) return toast('הכמות 0. הגדר סיכון $ וגודל תיק בהגדרות');
+    var p = r.plan; if (window.__pro && !window.__pro.gateOk()) return; if (!p.qty) return toast('הכמות 0. הגדר סיכון $ וגודל תיק בהגדרות');
     var tk = r.sym.replace('/USD', ''), dir = r.dir;
     var tr = { id: 't' + Date.now(), mode: MODE, ticker: tk, dir: dir, status: 'planned', created: Date.now(), horizon: 'swing',
       plan: { entry: p.entry, stop: p.stop, tp: [p.t1, p.t2], condition: 'סריקת מניות: ' + DEC[r.step][1] + ' (' + r.comp + '/100)', reasons: r.why.slice(0, 4), pattern: 'ציון משולב ' + r.comp, bias: r.dir, invalidation: (dir === 'long' ? 'סגירה מתחת ל-' : 'סגירה מעל ') + px(p.stop), analysts: r.rec ? Math.round(r.rec.share * 100) + '% ממליצים קנייה' : null, news_context: null },

@@ -64,13 +64,13 @@
     var seen = {}, cut = Date.now() - 2 * 864e5;
     ST.items = all.filter(function (i) { if (!i.title || !/^https?:/.test(i.link)) return false; if (i.t && i.t < cut) return false; var k = i.title.toLowerCase().replace(/[^a-z0-9֐-׿]/g, '').slice(0, 60); if (seen[k]) return false; seen[k] = 1; i.en = i.en && !isHe(i.title); return true; })
       .sort(function (a, b) { return (b.t || 0) - (a.t || 0); });
-    ST.t = Date.now(); ST.busy = false; paint();
+    ST.t = Date.now(); ST.busy = false; paint(); speakNew();
   }
   function paint() {
     var list = ST.items.filter(function (i) { return ST.cat === 'all' || i.c === ST.cat; }), cnt = {}; ST.items.forEach(function (i) { cnt[i.c] = (cnt[i.c] || 0) + 1; });
     var hasEn = list.some(function (i) { return i.en && !ST.tr[i.title]; });
     var chips = '<div class="tabs wire-tabs" style="margin:0 0 6px">' + CH.map(function (c) { return '<button data-wc="' + c[0] + '"' + (ST.cat === c[0] ? ' class="on"' : '') + '>' + c[1] + (c[0] === 'all' ? ' ' + ST.items.length : cnt[c[0]] ? ' ' + cnt[c[0]] : '') + '</button>'; }).join('') + '</div>';
-    var tools = '<div class="wire-tools" style="display:flex;gap:10px;font-size:12px;color:var(--ink2);margin:0 2px 4px;align-items:center">' + (ST.t ? '<span>עודכן ' + new Date(ST.t).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '<a href="#" data-wr>רענן</a><a href="#" data-wa>הוסף אתר</a><span>' + feeds().length + ' מקורות</span>' + (hasEn && typeof aiKey === 'function' && aiKey() ? '<a href="#" data-wt>תרגם לעברית</a>' : '') + '</div>';
+    var tools = '<div class="wire-tools" style="display:flex;gap:10px;font-size:12px;color:var(--ink2);margin:0 2px 4px;align-items:center">' + (ST.t ? '<span>עודכן ' + new Date(ST.t).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '<a href="#" data-wr>רענן</a><a href="#" data-wq>' + (S.squawk ? 'קריין: פועל' : 'קריין חדשות') + '</a><a href="#" data-wa>הוסף אתר</a><span>' + feeds().length + ' מקורות</span>' + (hasEn && typeof aiKey === 'function' && aiKey() ? '<a href="#" data-wt>תרגם לעברית</a>' : '') + '</div>';
     var body = ST.busy && !ST.items.length ? '<div class="empty">טוען חדשות מכל המקורות…</div>' : list.length ? list.slice(0, 120).map(function (i) {
       var ttl = ST.tr[i.title] || i.title; return '<div class="ni" style="padding:8px 4px"><div class="top"><span>' + esc(i.src) + (i.t ? ' · ' + new Date(i.t).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '') + '</span></div><a href="' + esc(i.link) + '" target="_blank" rel="noopener" style="font-size:14px;color:var(--ink);margin-top:2px"' + (i.en && !ST.tr[i.title] ? ' dir="ltr"' : '') + '>' + esc(ttl) + '</a></div>'; }).join('') : '<div class="empty">לא הצלחתי למשוך חדשות כרגע. נסה לרענן.</div>';
     ['#rss', '#rss2'].forEach(function (s) { var el = $q(s); if (el) el.innerHTML = chips + tools + body; });
@@ -89,9 +89,18 @@
     var t = e.target; if (!t.closest) return;
     var b = t.closest('[data-wc]'); if (b && b.closest('#rss, #rss2')) { ST.cat = b.dataset.wc; paint(); return; }
     var r = t.closest('[data-wr]'); if (r && r.closest('#rss, #rss2')) { e.preventDefault(); load(true); return; }
+    var sq = t.closest('[data-wq]'); if (sq && sq.closest('#rss, #rss2')) { e.preventDefault(); S.squawk = !S.squawk; saveS(); ST.spoken = Date.now(); paint(); if (S.squawk && typeof toast === 'function') toast('הקריין יקריא כותרות חשובות חדשות: מאקרו, אנליסטים והמניות שלך'); return; }
     var ad = t.closest('[data-wa]'); if (ad && ad.closest('#rss, #rss2')) { e.preventDefault(); addSite(); return; }
     var tr = t.closest('[data-wt]'); if (tr && tr.closest('#rss, #rss2')) { e.preventDefault(); translate(); }
   });
+  function speakNew() {
+    if (!S.squawk || typeof speechSynthesis === 'undefined') return; var since = ST.spoken || 0, mine = {};
+    try { (D.watch || []).forEach(function (w) { (w.items || []).forEach(function (t) { mine[t] = 1; }); }); (D.trades || []).forEach(function (t) { if (t.status !== 'closed') mine[t.ticker] = 1; }); } catch (e) { }
+    var imp = /Fed|Powell|tariff|inflation|CPI|jobs|rate cut|Trump|upgrade|downgrade|פד|ריבית|אינפלציה|מכס|שדרוג|הורדת/i;
+    var fresh = ST.items.filter(function (i) { return i.t > since && (i.c === 'macro' || i.c === 'an' || imp.test(i.title) || Object.keys(mine).some(function (k) { return k.length >= 3 && new RegExp('(^|[^A-Za-z])' + k + '([^A-Za-z]|$)').test(i.title); })); }).slice(0, 3);
+    ST.spoken = Date.now();
+    fresh.forEach(function (i) { var tx = ST.tr[i.title] || i.title, u = new SpeechSynthesisUtterance(tx); u.lang = /[֐-׿]/.test(tx) ? 'he-IL' : 'en-US'; speechSynthesis.speak(u); });
+  }
   window.loadRSS = function () { return load(false); };
   function addSite() {
     var v = (prompt('כתובת אתר (למשל bizportal.co.il) או כתובת RSS:') || '').trim(); if (!v) return;
@@ -99,7 +108,7 @@
     CUSTOM.push({ n: dom ? h : v.replace(/^https?:\/\//, '').slice(0, 30), c: il ? 'il' : 'us', en: !il, gn: dom, u: dom ? g('site:' + h, il) : v });
     try { localStorage.setItem('adir-wire-custom', JSON.stringify(CUSTOM)); } catch (e) { } load(true);
   }
-  window.__wire = { state: ST, load: load, FEEDS: FEEDS, feeds: feeds, add: function (x) { CUSTOM.push(x); load(true); } };
+  window.__wire = { speakNew: speakNew, state: ST, load: load, FEEDS: FEEDS, feeds: feeds, add: function (x) { CUSTOM.push(x); load(true); } };
   document.querySelectorAll('h2').forEach(function (h) { if (/^מהעיתונות/.test(h.textContent.trim())) h.firstChild.textContent = 'חדשות הבורסה '; });
   setInterval(function () { load(false); }, 5 * 60e3); setTimeout(function () { load(false); }, 1200);
 })();

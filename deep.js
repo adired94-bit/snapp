@@ -198,10 +198,10 @@
      טכני + חדשות החברה + מאקרו + סקטור + פוליטיקה ורגולציה + אנליסטים + יסודות + מצב השוק.
      כל רכיב מ-100- (שורט) עד 100+ (לונג). המשקלות תלויים באופק: ביומי הטכני והחדשות מובילים, בארוך היסודות והאנליסטים. */
   var UW = {
-    day:   { tech: 0.40, headlines: 0.12, company: 0.12, macro: 0.10, sector: 0.10, politics: 0.05, analysts: 0.05, fund: 0.05, regime: 0.05 },
-    swing: { tech: 0.28, headlines: 0.10, company: 0.10, macro: 0.12, sector: 0.10, politics: 0.06, analysts: 0.12, fund: 0.12, regime: 0.06 },
-    long:  { tech: 0.20, headlines: 0.05, company: 0.07, macro: 0.12, sector: 0.10, politics: 0.05, analysts: 0.15, fund: 0.24, regime: 0.06 } };
-  var UL = { tech: 'טכני', headlines: 'כותרות אחרונות', company: 'חדשות החברה', macro: 'מאקרו', sector: 'הסקטור', politics: 'פוליטיקה ורגולציה', analysts: 'אנליסטים', fund: 'יסודות החברה', regime: 'מצב השוק' };
+    day:   { tech: 0.40, headlines: 0.12, journal: 0.05, company: 0.12, macro: 0.10, sector: 0.10, politics: 0.05, analysts: 0.05, fund: 0.05, regime: 0.05 },
+    swing: { tech: 0.28, headlines: 0.10, journal: 0.05, company: 0.10, macro: 0.12, sector: 0.10, politics: 0.06, analysts: 0.12, fund: 0.12, regime: 0.06 },
+    long:  { tech: 0.20, headlines: 0.05, journal: 0.03, company: 0.07, macro: 0.12, sector: 0.10, politics: 0.05, analysts: 0.15, fund: 0.24, regime: 0.06 } };
+  var UL = { tech: 'טכני', headlines: 'כותרות אחרונות', journal: 'היומן שלך', company: 'חדשות החברה', macro: 'מאקרו', sector: 'הסקטור', politics: 'פוליטיקה ורגולציה', analysts: 'אנליסטים', fund: 'יסודות החברה', regime: 'מצב השוק' };
   var ENTRY = 40, LEAN = 18, GATE_OLD = 'ציון מאוחד עבר סף כניסה ללא ווטו', GATE_NEW = 'הציון המשולב מספיק חזק';
   var cv = function (x) { return Math.max(-100, Math.min(100, x)); };
   /* כותרות אחרונות על המניה: מ-Finnhub ומזרם החדשות של האתר (48 שעות), עם ניקוד גם לעברית */
@@ -225,6 +225,7 @@
     var W = UW[k], P = [], ai = res.ctx && res.ctx.ai && !res.ctx.ai.err ? res.ctx.ai : null, sc = (ai && ai.scores) || {};
     var add = function (key, v, detail) { if (v == null || !isFinite(v)) return; P.push({ k: key, label: UL[key], w: W[key], v: Math.round(cv(v)), detail: detail || '' }); };
     add('tech', m.ex.score, m.ex.headline);
+    var je = window.__pro && window.__pro.journalEdge ? window.__pro.journalEdge(res.sym, m.uni ? m.uni.dir : (m.ex.score >= 0 ? 'long' : 'short')) : null; if (je) add('journal', je.v, je.detail);
     var hl = headlines(res); if (hl.length >= 2) { var pos = hl.filter(function (x) { return x.s > 0.2; }).length, neg = hl.filter(function (x) { return x.s < -0.2; }).length, avg = hl.reduce(function (a, x) { return a + x.s; }, 0) / hl.length; add('headlines', avg * 100 * Math.min(1, hl.length / 3), hl.length + ' כותרות ב-48 שעות: ' + pos + ' חיוביות, ' + neg + ' שליליות'); }
     ['company', 'macro', 'sector', 'politics'].forEach(function (c) { if (ai && sc[c] != null) add(c, sc[c] * 50, ai[c] && ai[c][0] ? ai[c][0].point : ''); });
     var rec = res.fund && res.fund.rec, share = null;
@@ -423,7 +424,7 @@
       '<div class="dp-tiles">' + tile('כניסה', '$' + px(p.entry), 'ent', 'אזור $' + px(Math.min(p.zoneLo, p.zoneHi)) + ' – $' + px(Math.max(p.zoneLo, p.zoneHi))) + tile('סטופ לוס', '$' + px(p.stop), 'neg', '−' + num(p.riskPct, 2) + '%') +
       tile('יעד 1 · 2R', '$' + px(p.t1), 'pos', 'R:R 1:' + num(p.rr1, 1)) + tile('יעד 2 · 3R', '$' + px(p.t2), 'pos', 'R:R 1:' + num(p.rr2, 1)) + sz + '</div>' + capNote + obst +
       '<div class="dp-rules"><div><b>משך החזקה</b><span>' + p.hold + '</span></div><div><b>ניהול העסקה</b><span>' + p.trail + '</span></div><div><b>ביטול התרחיש</b><span>' + (long ? 'סגירה מתחת ל-$' + px(p.stop) : 'סגירה מעל $' + px(p.stop)) + ', או שהציון מתהפך לכיוון ההפוך.</span></div></div>' +
-      '<div class="dp-actions"><button class="btn" id="dpSave">שמור ליומן</button><button class="btn ghost" id="dpCopy">העתק</button><button class="btn ghost" id="dpCalcBtn">מחשבון</button><button class="btn ghost" id="dpChartBtn">גרף</button></div></section>';
+      '<div class="dp-actions"><button class="btn" id="dpSave">שמור ליומן</button><button class="btn ghost" id="dpCopy">העתק</button><button class="btn ghost" id="dpCalcBtn">מחשבון</button><button class="btn ghost" id="dpChartBtn">גרף</button><button class="btn ghost" id="dpAlert">התרע לי</button></div></section>';
   }
   function gatesHtml(m) {
     var g = m.gates;
@@ -544,12 +545,16 @@
     var r = DEEP.res;
     if (!r) { host.innerHTML = DEEP.busy ? '<div class="dp-skel"><i></i><i></i><i></i></div>' : ''; return; }
     var m = r.modes[DEEP.mode];
-    host.innerHTML = heroHtml(r, m) + regimeHtml(r) + uniHtml(m) + planHtml(r, m) + gatesHtml(m) + (window.DeepCtx ? DeepCtx.html(r) : '') + (DEEP.mode === 'day' ? dayHtml(r) : trendHtml(r) + (DEEP.mode === 'long' ? qualityHtml(r) : '')) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m) +
+    if (DEEP.full == null) { try { DEEP.full = localStorage.getItem('adir-dpfull') === '1'; } catch (e) { DEEP.full = false; } }
+    var more = (window.DeepCtx ? DeepCtx.html(r) : '') + (DEEP.mode === 'day' ? dayHtml(r) : trendHtml(r) + (DEEP.mode === 'long' ? qualityHtml(r) : '')) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m);
+    host.innerHTML = heroHtml(r, m) + regimeHtml(r) + uniHtml(m) + planHtml(r, m) + gatesHtml(m) + '<button class="btn ghost dp-morebtn" id="dpMoreBtn">' + (DEEP.full ? 'הסתר פירוט' : 'הצג פירוט מלא: חדשות, מאקרו, גרפים, יסודות ועוד') + '</button>' + (DEEP.full ? more : '') +
       '<div class="dp-foot">נוצר ' + new Date(r.at).toLocaleTimeString('he-IL') + '. כלי עזר אישי ולא ייעוץ השקעות. כל החלטה וכל הוראה באחריותך.</div>';
     $q('#dpOut').querySelectorAll('.dp-card,.dp-hero').forEach(function (el, i) { el.style.animationDelay = (i * 55) + 'ms'; });
     host.querySelectorAll('.dp-chip').forEach(function (b) { b.onclick = function () { DEEP.mode = b.dataset.mode; paint(); }; });
     var cv = $q('#dpChart'); if (cv && m.plan) { var tf = m.plan.tf; drawChart(cv, r.bars[tf] || [], m.plan, m.base); }
     var sv = $q('#dpSave'); if (sv) sv.onclick = function () { saveTrade(r, m); };
+    var al = $q('#dpAlert'); if (al) al.onclick = function () { if (window.__pro) window.__pro.alertsFor(r, m); };
+    var mb = $q('#dpMoreBtn'); if (mb) mb.onclick = function () { DEEP.full = !DEEP.full; try { localStorage.setItem('adir-dpfull', DEEP.full ? '1' : ''); } catch (e) { } paint(); };
     var cp = $q('#dpCopy'); if (cp) cp.onclick = function () { copyPlan(r, m); };
     var cb = $q('#dpChartBtn'); if (cb) cb.onclick = function () { goPage('p-today'); onEnter('p-today'); loadChart(r.sym === 'BTC/USD' ? 'BTC' : r.sym); };
     if (window.DeepCtx) DeepCtx.bind();
@@ -567,7 +572,7 @@
   }
   function copyPlan(r, m) { var t = planText(r, m); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('התוכנית הועתקה'); }).catch(function () { toast('לא ניתן להעתיק'); }); }
   async function saveTrade(r, m) {
-    var p = m.plan; if (!p) return;
+    var p = m.plan; if (!p) return; if (window.__pro && !window.__pro.gateOk()) return;
     if (!p.qty) return toast('הכמות 0. הגדר סיכון $ בהגדרות או הדק סטופ');
     var tk = r.sym.replace('/USD', ''), dir = p.dir, why = m.ex.pros.slice(0, 4);
     var tr = { id: 't' + Date.now(), mode: MODE, ticker: tk, dir: dir, status: 'planned', created: Date.now(), horizon: m.mode,

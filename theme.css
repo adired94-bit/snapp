@@ -341,3 +341,9 @@ nav button{font-size:13px;min-height:54px;font-weight:700}nav button svg{width:2
 .check li{min-height:52px}.check input[type=checkbox]{width:24px;height:24px}
 @media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;transition-duration:.01ms!important}}
 #qs .btn{width:auto!important;flex:0 0 auto;padding:0 22px}#qs input{flex:1 1 auto;width:auto}
+
+.pro-bar{display:flex;gap:14px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--ink2);padding:6px 10px;margin:6px 0;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.pro-bar b{font-weight:800}.pro-bar a{color:var(--ink);text-decoration:underline}.pro-bar.lock{border-color:var(--down);background:rgba(255,84,112,.1);color:var(--ink)}
+.pro-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#556;margin-inline-end:6px}.pro-dot.on{background:var(--up);box-shadow:0 0 8px var(--up)}
+.dp-livep{margin-top:8px;font-size:13px;color:var(--ink2);direction:rtl}.dp-livep b{color:var(--ink);direction:ltr;display:inline-block}
+.dp-morebtn{width:100%;margin:6px 0 10px}
