@@ -51,7 +51,7 @@ textarea.rules{margin-top:10px;min-height:70px;resize:vertical}
 .check input{appearance:none;width:24px;height:24px;flex:0 0 24px;border:2px solid var(--ink2);border-radius:7px;margin-top:1px;position:relative}
 .check input:checked{background:var(--up);border-color:var(--up)}
 .check input:checked::after{content:"";position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310141C' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") center/16px no-repeat}
-.check li span{flex:1}.check li.done span{color:var(--ink2);text-decoration:line-through}
+.check li span{flex:1}.check .dlk{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.check .dlk a{font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);text-decoration:none;white-space:nowrap}.check .dlk a:hover{border-color:var(--btc)}@media(max-width:600px){.check li{flex-wrap:wrap}.check .dlk{flex-basis:100%;padding-inline-start:34px;justify-content:flex-start}}.check li.done span{color:var(--ink2);text-decoration:line-through}
 .progress{height:6px;background:var(--panel2);border-radius:99px;overflow:hidden;margin:6px 0 10px}.progress i{display:block;height:100%;background:var(--up);width:0;transition:width .25s}
 .jform{display:grid;grid-template-columns:1fr 1fr;gap:8px}.jform .full{grid-column:1/-1}.jform textarea{min-height:60px;resize:vertical}
 .btn{background:var(--btc);color:#1a1200;border:0;border-radius:10px;padding:11px 16px;font:inherit;font-weight:700;width:100%}
@@ -1131,10 +1131,22 @@ function sizer(){const r=+$('#szRisk').value,e=+$('#szEntry').value,s=+$('#szSto
 ['szRisk','szEntry','szStop'].forEach(id=>$('#'+id).oninput=sizer);
 
 /* ================= צ'ק ליסט יומי ================= */
+const APP=location.pathname+'?go=';
+/* לכל משימה: כפתורים שפותחים בלשונית חדשה את המקום שבו מבצעים אותה, עם נתוני אמת */
+const DAILY_LINKS=[
+  [['נתוני שוק','https://finviz.com/futures.ashx'],['לפני הפתיחה','https://www.cnbc.com/pre-markets/']],
+  [['יומן כלכלי','https://www.tradingview.com/economic-calendar/'],['דוחות היום','https://finance.yahoo.com/calendar/earnings']],
+  [['חדשות','https://finviz.com/news.ashx'],['מניות מובילות','https://finviz.com/screener.ashx?v=111&s=ta_topgainers']],
+  [['סריקה',APP+'p-smart']],
+  [['רמות',APP+'p-lvl'],['גרף',APP+'p-today']],
+  [['מחשבון עסקה',APP+'p-calc']],
+  [['מחשבון סיכון',APP+'p-calc']],
+  [['התיק',APP+'p-port']],
+  [['שעון וול סטריט','https://www.tradinghours.com/markets/nyse']]];
 function renderDaily(){
   if(D.daily.date!==todayStr()){D.daily={date:todayStr(),checks:DAILY.map(()=>false)}}
   const done=D.daily.checks.filter(Boolean).length;$('#dailyCount').textContent=`${done}/${DAILY.length}`;$('#dailyBar').style.width=done/DAILY.length*100+'%';
-  $('#daily').innerHTML=DAILY.map((t,i)=>`<li class="${D.daily.checks[i]?'done':''}"><input type="checkbox" data-i="${i}" ${D.daily.checks[i]?'checked':''}><span>${t}</span></li>`).join('');
+  $('#daily').innerHTML=DAILY.map((t,i)=>`<li class="${D.daily.checks[i]?'done':''}"><input type="checkbox" data-i="${i}" ${D.daily.checks[i]?'checked':''}><span>${t}</span><div class="dlk">${(DAILY_LINKS[i]||[]).map(([n,u])=>`<a href="${u}" target="_blank" rel="noopener">${n} ↗</a>`).join('')}</div></li>`).join('');
   $$('#daily input').forEach(cb=>cb.onchange=()=>{D.daily.checks[cb.dataset.i]=cb.checked;save();renderDaily()});
 }
 
@@ -1976,7 +1988,7 @@ function renderAll(){renderMovers();renderRules();renderEvList();renderWatch();r
   if(D.watch&&!D.watch.some(w=>w.tape)){D.watch.slice(0,2).forEach(w=>w.tape=true)}
   if(!D.watchV||D.watchV<2){D.watch=JSON.parse(JSON.stringify(DEFAULT.watch));D.watchV=2;await save()}
   D.rules={...DEFAULT.rules,...(D.rules||{})};D.weekly=D.weekly||{};
-  loadSettingsUI();if(S.mode==='demo'){MODE='demo';document.body.classList.add('demo');$('#jModeNote').style.display='';$$('#modeSw button').forEach(b=>{b.classList.toggle('on',b.dataset.mode==='demo');b.classList.toggle('demo',b.dataset.mode==='demo')})}renderAll();loadTape();curSym='MSTR';renderTicket();setTimeout(firstRun,800);setSync(SB?'ok':'off');
+  loadSettingsUI();if(S.mode==='demo'){MODE='demo';document.body.classList.add('demo');$('#jModeNote').style.display='';$$('#modeSw button').forEach(b=>{b.classList.toggle('on',b.dataset.mode==='demo');b.classList.toggle('demo',b.dataset.mode==='demo')})}renderAll();loadTape();curSym='MSTR';renderTicket();setTimeout(firstRun,800);{const go=new URLSearchParams(location.search).get('go');if(go&&document.getElementById(go))setTimeout(()=>goPage(go),500)}setSync(SB?'ok':'off');
   if(D.analyses['MSTR']){lastAnalysis=D.analyses['MSTR'];renderAnalysis(lastAnalysis);$('#aiToPlan').disabled=false}
   startMonitor();autoNews();startNewsTimer();ibkrSync();setLive(S.liveCh||'tv10');setTimeout(()=>moversScan(true),4000);
   document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&SB){const r=await sbGet();if(r&&(r.updatedAt||0)>(D.updatedAt||0)){D={...D,...r};await store.setLocal(D);renderAll();toast('עודכן מהענן')}}});
