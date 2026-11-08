@@ -24,7 +24,20 @@
     { n: 'ריבית ותשואות', c: 'macro', en: 1, u: g('Treasury yields OR inflation OR "rate cut" OR "jobs report"') },
     { n: 'אנליסטים', c: 'an', en: 1, u: g('analyst upgrade OR downgrade OR "price target" stock') },
     { n: 'אנליסטים בישראל', c: 'an', u: g('אנליסטים OR "בית השקעות" OR "מחיר יעד" מניה', 1) }];
-  var CH = [['all', 'הכל'], ['il', 'ישראל'], ['us', 'ארה"ב'], ['macro', 'מאקרו ופוליטיקה'], ['an', 'אנליסטים']];
+  var site = function (a) { return a.map(function (d) { return 'site:' + d; }).join(' OR '); };
+  var GROUPS = [
+    ['il', 'אתרי כלכלה בישראל', 1, ['globes.co.il', 'calcalist.co.il', 'themarker.com', 'bizportal.co.il', 'funder.co.il', 'news1.co.il']],
+    ['il', 'עיתונות ישראלית', 1, ['ynet.co.il', 'mako.co.il', 'maariv.co.il', 'israelhayom.co.il', 'walla.co.il', 'davidoff-news.co.il', 'bizzness.co.il']],
+    ['il', 'Israel business (English)', 0, ['en.globes.co.il', 'calcalistech.com', 'timesofisrael.com', 'jpost.com', 'haaretz.com']],
+    ['us', 'Wall Street', 0, ['reuters.com', 'bloomberg.com', 'wsj.com', 'ft.com', 'barrons.com', 'cnbc.com']],
+    ['us', 'Markets', 0, ['marketwatch.com', 'investing.com', 'finance.yahoo.com', 'seekingalpha.com', 'benzinga.com', 'investors.com']],
+    ['us', 'Stocks and analysts', 0, ['fool.com', 'tipranks.com', 'zacks.com', 'thestreet.com', 'morningstar.com', 'businessinsider.com', 'forbes.com']],
+    ['us', 'Global markets', 0, ['economist.com', 'asia.nikkei.com', 'scmp.com', 'bbc.com', 'theguardian.com', 'aljazeera.com']],
+    ['us', 'Crypto', 0, ['coindesk.com', 'cointelegraph.com', 'theblock.co', 'decrypt.co']]];
+  GROUPS.forEach(function (x) { FEEDS.push({ n: x[1], c: x[0], en: !x[2], gn: 1, u: g(site(x[3]) + ' (stocks OR market OR shares OR economy' + (x[2] ? ' OR בורסה OR מניות OR כלכלה' : '') + ')', x[2]) }); });
+  var CUSTOM = []; try { CUSTOM = JSON.parse(localStorage.getItem('adir-wire-custom') || '[]'); } catch (e) { }
+  var feeds = function () { return FEEDS.concat(CUSTOM); };
+  var CH = [['all', 'הכל'], ['il', 'ישראל'], ['us', 'ארה"ב והעולם'], ['macro', 'מאקרו ופוליטיקה'], ['an', 'אנליסטים']];
   var ST = { items: [], cat: 'all', t: 0, busy: false, tr: {} }; try { ST.tr = JSON.parse(localStorage.getItem('adir-wire-tr') || '{}'); } catch (e) { }
   var isHe = function (t) { return /[֐-׿]/.test(t); };
   function parseXml(txt, f) {
@@ -46,7 +59,7 @@
   }
   async function load(force) {
     if (ST.busy || (!force && Date.now() - ST.t < 5 * 60e3)) return; ST.busy = true; paint();
-    var all = [], parts = await Promise.all(FEEDS.map(function (f) { return pull(f).then(function (a) { return a.slice(0, 25).map(function (i) { return { title: i.title, link: i.link, t: i.t, src: f.n, c: f.c, en: !!f.en && !isHe(i.title) }; }); }); }).concat([finnhub()]));
+    var all = [], parts = await Promise.all(feeds().map(function (f) { return pull(f).then(function (a) { return a.slice(0, 40).map(function (i) { var ti = i.title, sr = f.n; if (f.gn) { var m = ti.match(/^(.*) - ([^-]{2,40})$/); if (m) { ti = m[1]; sr = m[2]; } } return { title: ti, link: i.link, t: i.t, src: sr, c: f.c, en: !!f.en && !isHe(ti) }; }); }); }).concat([finnhub()]));
     parts.forEach(function (a) { all = all.concat(a); });
     var seen = {}, cut = Date.now() - 2 * 864e5;
     ST.items = all.filter(function (i) { if (!i.title || !/^https?:/.test(i.link)) return false; if (i.t && i.t < cut) return false; var k = i.title.toLowerCase().replace(/[^a-z0-9֐-׿]/g, '').slice(0, 60); if (seen[k]) return false; seen[k] = 1; i.en = i.en && !isHe(i.title); return true; })
@@ -57,8 +70,8 @@
     var list = ST.items.filter(function (i) { return ST.cat === 'all' || i.c === ST.cat; }), cnt = {}; ST.items.forEach(function (i) { cnt[i.c] = (cnt[i.c] || 0) + 1; });
     var hasEn = list.some(function (i) { return i.en && !ST.tr[i.title]; });
     var chips = '<div class="tabs wire-tabs" style="margin:0 0 6px">' + CH.map(function (c) { return '<button data-wc="' + c[0] + '"' + (ST.cat === c[0] ? ' class="on"' : '') + '>' + c[1] + (c[0] === 'all' ? ' ' + ST.items.length : cnt[c[0]] ? ' ' + cnt[c[0]] : '') + '</button>'; }).join('') + '</div>';
-    var tools = '<div class="wire-tools" style="display:flex;gap:10px;font-size:12px;color:var(--ink2);margin:0 2px 4px;align-items:center">' + (ST.t ? '<span>עודכן ' + new Date(ST.t).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '<a href="#" data-wr>רענן</a>' + (hasEn && typeof aiKey === 'function' && aiKey() ? '<a href="#" data-wt>תרגם לעברית</a>' : '') + '</div>';
-    var body = ST.busy && !ST.items.length ? '<div class="empty">טוען חדשות מכל המקורות…</div>' : list.length ? list.slice(0, 80).map(function (i) {
+    var tools = '<div class="wire-tools" style="display:flex;gap:10px;font-size:12px;color:var(--ink2);margin:0 2px 4px;align-items:center">' + (ST.t ? '<span>עודכן ' + new Date(ST.t).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '<a href="#" data-wr>רענן</a><a href="#" data-wa>הוסף אתר</a><span>' + feeds().length + ' מקורות</span>' + (hasEn && typeof aiKey === 'function' && aiKey() ? '<a href="#" data-wt>תרגם לעברית</a>' : '') + '</div>';
+    var body = ST.busy && !ST.items.length ? '<div class="empty">טוען חדשות מכל המקורות…</div>' : list.length ? list.slice(0, 120).map(function (i) {
       var ttl = ST.tr[i.title] || i.title; return '<div class="ni" style="padding:8px 4px"><div class="top"><span>' + esc(i.src) + (i.t ? ' · ' + new Date(i.t).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '') + '</span></div><a href="' + esc(i.link) + '" target="_blank" rel="noopener" style="font-size:14px;color:var(--ink);margin-top:2px"' + (i.en && !ST.tr[i.title] ? ' dir="ltr"' : '') + '>' + esc(ttl) + '</a></div>'; }).join('') : '<div class="empty">לא הצלחתי למשוך חדשות כרגע. נסה לרענן.</div>';
     ['#rss', '#rss2'].forEach(function (s) { var el = $q(s); if (el) el.innerHTML = chips + tools + body; });
     var tm = $q('#rssTime'), tm2 = $q('#rssTime2'); [tm, tm2].forEach(function (e) { if (e && ST.t) e.textContent = new Date(ST.t).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }); });
@@ -76,10 +89,17 @@
     var t = e.target; if (!t.closest) return;
     var b = t.closest('[data-wc]'); if (b && b.closest('#rss, #rss2')) { ST.cat = b.dataset.wc; paint(); return; }
     var r = t.closest('[data-wr]'); if (r && r.closest('#rss, #rss2')) { e.preventDefault(); load(true); return; }
+    var ad = t.closest('[data-wa]'); if (ad && ad.closest('#rss, #rss2')) { e.preventDefault(); addSite(); return; }
     var tr = t.closest('[data-wt]'); if (tr && tr.closest('#rss, #rss2')) { e.preventDefault(); translate(); }
   });
   window.loadRSS = function () { return load(false); };
-  window.__wire = { state: ST, load: load, FEEDS: FEEDS };
+  function addSite() {
+    var v = (prompt('כתובת אתר (למשל bizportal.co.il) או כתובת RSS:') || '').trim(); if (!v) return;
+    var dom = /^https?:\/\/[^\/]+\/?$/.test(v) || !/^https?:/.test(v), h = v.replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, ''), il = /\.co\.il$|\.org\.il$|themarker|calcalist/.test(h);
+    CUSTOM.push({ n: dom ? h : v.replace(/^https?:\/\//, '').slice(0, 30), c: il ? 'il' : 'us', en: !il, gn: dom, u: dom ? g('site:' + h, il) : v });
+    try { localStorage.setItem('adir-wire-custom', JSON.stringify(CUSTOM)); } catch (e) { } load(true);
+  }
+  window.__wire = { state: ST, load: load, FEEDS: FEEDS, feeds: feeds, add: function (x) { CUSTOM.push(x); load(true); } };
   document.querySelectorAll('h2').forEach(function (h) { if (/^מהעיתונות/.test(h.textContent.trim())) h.firstChild.textContent = 'חדשות הבורסה '; });
   setInterval(function () { load(false); }, 5 * 60e3); setTimeout(function () { load(false); }, 1200);
 })();
