@@ -70,6 +70,7 @@ nav{position:fixed;bottom:0;right:0;left:0;background:var(--panel);border-top:1p
 nav button{flex:1;background:none;border:0;color:var(--ink2);font:inherit;font-size:11px;padding:6px 0;display:flex;flex-direction:column;align-items:center;gap:3px}
 nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 nav button.on{color:var(--btc)}
+@media(min-width:900px){nav{left:50%;right:auto;transform:translateX(-50%);width:min(680px,100%);border:1px solid var(--line);border-bottom:0;border-radius:16px 16px 0 0}}
 .toast{position:fixed;bottom:90px;right:50%;transform:translateX(50%);background:var(--ink);color:var(--bg);padding:8px 16px;border-radius:999px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9;max-width:90vw;text-align:center}
 .toast.on{opacity:1}
 /* ניתוח */
@@ -355,28 +356,45 @@ body.demo header{margin-top:22px}
 <body>
 <header>
   <h1>יומן <span>המסחר</span> <small style="font-size:11px;color:var(--ink2);font-weight:400">v14.5</small><span class="modesw" id="modeSw"><button data-mode="live" class="on">אמיתי</button><button data-mode="demo">דמו</button></span></h1>
-  <div class="hs"><time id="today"></time><br><span id="sync"></span> · <span id="mon">מוניטור כבוי</span><span id="ibkrHead"></span></div>
+  <div style="display:flex;align-items:flex-start;gap:8px"><button class="btn ghost small" id="gearBtn" title="הגדרות (מפתחות, חוקים, התראות)">⚙️</button><div class="hs"><time id="today"></time><br><span id="sync"></span> · <span id="mon">מוניטור כבוי</span><span id="ibkrHead"></span></div></div>
 </header>
 <div class="tape"><div id="tape"></div></div>
 <main>
+<div class="tabs" id="subnav" style="display:none"></div>
 
-<!-- היום -->
-<section class="page on" id="p-today">
-  <div class="today3">
-    <aside class="tcol" id="colNews">
-      <h2 style="margin-top:4px">חדשות <small id="todayNewsT"></small><button class="btn ghost small" id="tnRefresh">↻</button></h2>
-      <div class="tabs" id="tnTabs" style="margin:0 0 6px"></div>
-      <div class="card scrollcol" id="todayNews"></div>
-      <h2>מהעיתונות <small id="rssTime2"></small></h2>
-      <div class="card scrollcol" id="rss2" style="max-height:34vh"></div>
-    </aside>
-    <div class="today">
-      <div class="mood" id="mood"><b>טוען…</b></div>
+<!-- בוקר -->
+<section class="page on" id="p-morning">
+  <div class="today">
+    <div class="mood" id="mood"><b>טוען…</b></div>
       <div class="mood" id="eodBox" style="display:none"></div>
       <div class="big" id="bigCards" style="margin-top:10px"></div>
-      <h2>הפוזיציות שלי <small id="posCount"></small></h2>
-      <div class="card" id="todayPos"></div>
-      <div id="chartsBlock" style="margin-top:10px">
+      
+    <h2>צ'ק ליסט יומי <small id="dailyCount"></small></h2>
+  <div class="card"><div class="progress"><i id="dailyBar"></i></div><ul class="check" id="daily"></ul></div>
+  
+    <h2>החוקים שלי היום</h2>
+      <div class="card" id="todayRules"></div>
+      <h2>אירועים קרובים <small>7 ימים</small></h2>
+      <div class="card" id="todayEvents"></div>
+      
+    <h2>מדדים עכשיו</h2>
+      <div class="card" id="idxBox" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px"></div>
+      
+    <h2>הסורק היום <small id="scanMiniT"></small><button class="btn ghost small" id="scanMiniRun">סרוק</button></h2>
+      <div class="card" id="scanMini"></div>
+      
+    <div id="lessonBox"></div>
+    <h2>פעילות אחרונה</h2>
+      <div class="card" id="recentBox" style="max-height:30vh;overflow-y:auto"></div>
+    
+    <div class="qa"><button id="qaScan"><span>🔎</span>סורק</button><button id="qaChat"><span>💬</span>שאל</button><button id="qaWeekly"><span>📊</span>שבועי</button><button id="eodBtn"><span>🌙</span>סוף יום</button></div>
+  </div>
+</section>
+
+<!-- מסחר: גרף ועסקה -->
+<section class="page" id="p-today">
+  <div class="today">
+    <div id="chartsBlock" style="margin-top:10px">
   <div id="studies" style="display:none"></div>
   <div class="chartbar"><b id="chartSym" style="font-size:18px;font-weight:900;direction:ltr;text-align:right">MSTR</b><input id="symSearch" placeholder="🔍 חפש טיקר… (AAPL, TSLA)" style="width:190px;background:var(--panel);border:1px solid var(--line);border-radius:999px;color:var(--ink);font:inherit;font-size:13px;padding:7px 12px;direction:ltr;text-transform:uppercase"><button class="btn ghost small" id="whoBtn" title="מי החברה?">ℹ️ מי זו?</button><span style="flex:1"></span><span style="display:none"><button data-view="tv" class="on"></button><button data-view="pos"></button></span><button class="btn ghost small" id="wlRefresh" title="רענן מחירים">⟳</button><button class="btn ghost small" id="openTV" title="פותח ב-TradingView עם החשבון והקווים שלך">TV ↗</button><button class="btn blue small" id="snap">📷 העתק גרף לניתוח</button></div>
   <div class="cwrap">
@@ -386,14 +404,23 @@ body.demo header{margin-top:22px}
   <h2>צ'ק ליסט <b id="ckSym" style="direction:ltr">MSTR</b> <small id="ckState"></small></h2>
   <div class="card" id="ck"></div>
 </div>
-      <h2>החוקים שלי היום</h2>
-      <div class="card" id="todayRules"></div>
-      <h2>אירועים קרובים <small>7 ימים</small></h2>
-      <div class="card" id="todayEvents"></div>
-      <div class="qa"><button id="qaScan"><span>🔎</span>סורק</button><button id="qaChat"><span>💬</span>שאל</button><button id="qaWeekly"><span>📊</span>שבועי</button></div>
-    </div>
-    <aside class="tcol" id="colLeft">
-      <h2 style="margin-top:4px">📺 שידור חי</h2>
+
+  </div>
+</section>
+
+<!-- תיק -->
+<section class="page" id="p-port">
+  <div class="today">
+    <h2>הפוזיציות שלי <small id="posCount"></small></h2>
+      <div class="card" id="todayPos"></div>
+      
+  </div>
+</section>
+
+<!-- שידור חי -->
+<section class="page" id="p-live">
+  <div class="today">
+    <h2 style="margin-top:4px">📺 שידור חי</h2>
       <div class="card">
     <div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><div class="subtabs" style="margin:0;flex:1"><button data-live="tv10" class="on">ערוץ 10 – כלכלה</button><button data-live="bbg">Bloomberg</button><button data-live="yf">Yahoo</button><button data-live="off">כבוי</button></div></div>
@@ -402,27 +429,7 @@ body.demo header{margin-top:22px}
     </div>
     <div class="script" id="radioScript"></div>
   </div>
-      <div id="lessonBox"></div>
-      <h2>מדדים עכשיו</h2>
-      <div class="card" id="idxBox" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px"></div>
-      <h2>קפיצות של 10%+ <small id="moversT">אוטומטי</small></h2>
-      <div class="card" id="moversBox" style="max-height:26vh;overflow-y:auto"><div class="empty">סורק את כל הרשימות כל 5 דק' בשעות המסחר. מניה שזזה ±10% נכנסת, ירדה מתחת – יוצאת.</div></div>
-      <h2>הסורק היום <small id="scanMiniT"></small><button class="btn ghost small" id="scanMiniRun">סרוק</button></h2>
-      <div class="card" id="scanMini"></div>
-      <h2>פעילות אחרונה</h2>
-      <div class="card" id="recentBox" style="max-height:30vh;overflow-y:auto"></div>
-    </aside>
-  </div>
-</section>
-
-<!-- עוד -->
-<section class="page" id="p-more">
-  <div class="more">
-    <button data-go="p-news"><span>📰</span>חדשות<small>בעברית, מתעדכן לבד</small></button>
-    <button data-go="p-scan"><span>🔎</span>סורק הזדמנויות<small>מכל הרשימות, פעם ביום</small></button>
-    <button data-go="p-weekly"><span>📊</span>סיכום שבועי<small>מה עבד, מה לא, מה לשנות</small></button>
-    <button id="eodBtn"><span>🌙</span>סוף יום<small>סיכום היום, עכשיו</small></button>
-    <button data-go="p-set"><span>⚙️</span>הגדרות<small>מפתחות, חוקים, התראות</small></button>
+      
   </div>
 </section>
 
@@ -431,6 +438,11 @@ body.demo header{margin-top:22px}
   <h2>סורק הזדמנויות <small id="scanT"></small><button class="btn small" id="scanRun">סרוק עכשיו</button></h2>
   <div class="hint" style="margin:0 4px 8px">עובר על כל המניות ברשימות שלך: תנועה חריגה, פריצה/שבירה של 20 יום, קרבה לתמיכה/התנגדות. מציג עד 6. לחיצה → ניתוח.</div>
   <div class="card" id="scanOut"><div class="empty">עוד לא נסרק היום.</div></div>
+  <div class="today">
+    <h2>קפיצות של 10%+ <small id="moversT">אוטומטי</small></h2>
+      <div class="card" id="moversBox" style="max-height:26vh;overflow-y:auto"><div class="empty">סורק את כל הרשימות כל 5 דק' בשעות המסחר. מניה שזזה ±10% נכנסת, ירדה מתחת – יוצאת.</div></div>
+      
+  </div>
 </section>
 
 <!-- סיכום שבועי -->
@@ -472,8 +484,6 @@ body.demo header{margin-top:22px}
 
 <!-- תוכנית -->
 <section class="page" id="p-plan">
-  <h2>צ'ק ליסט יומי <small id="dailyCount"></small></h2>
-  <div class="card"><div class="progress"><i id="dailyBar"></i></div><ul class="check" id="daily"></ul></div>
   <h2>תוכניות</h2>
   <div id="plans"></div>
   <button class="btn ghost" id="addPlan">+ הוסף מניה לתוכנית</button>
@@ -535,6 +545,14 @@ body.demo header{margin-top:22px}
   </div>
   <h2>מהעיתונות הכלכלית <small id="rssTime"></small></h2>
   <div class="card" id="rss"><div class="empty">טוען…</div></div>
+  <div class="today">
+    <h2 style="margin-top:4px">חדשות <small id="todayNewsT"></small><button class="btn ghost small" id="tnRefresh">↻</button></h2>
+      <div class="tabs" id="tnTabs" style="margin:0 0 6px"></div>
+      <div class="card scrollcol" id="todayNews"></div>
+      <h2>מהעיתונות <small id="rssTime2"></small></h2>
+      <div class="card scrollcol" id="rss2" style="max-height:34vh"></div>
+    
+  </div>
 </section>
 
 <!-- הגדרות -->
@@ -586,10 +604,12 @@ body.demo header{margin-top:22px}
 </main>
 
 <nav>
-  <button data-p="p-today" class="on"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>היום</button>
-  <button data-p="p-ai"><svg viewBox="0 0 24 24"><path d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2zM5 17l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg>ניתוח</button>
-  <button data-p="p-journal"><svg viewBox="0 0 24 24"><path d="M4 4h12l4 4v12H4zM8 4v5h8V4M8 14h8M8 18h5"/></svg>יומן</button>
-  <button data-p="p-more"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>עוד</button>
+  <button data-g="morning" class="on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>בוקר</button>
+  <button data-g="trade"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-7"/></svg>מסחר</button>
+  <button data-g="scan"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>סורק</button>
+  <button data-g="port"><svg viewBox="0 0 24 24"><path d="M4 8h16v11H4zM9 8V5h6v3"/></svg>תיק</button>
+  <button data-g="journal"><svg viewBox="0 0 24 24"><path d="M4 4h12l4 4v12H4zM8 4v5h8V4M8 14h8M8 18h5"/></svg>יומן</button>
+  <button data-g="news"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>חדשות</button>
 </nav>
 <button class="fab" id="chatFab" title="שאל את היומן"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="#1a1200" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5v7a2.5 2.5 0 0 1-2.5 2.5H10l-4.2 3.3a.6.6 0 0 1-1-.5V16A2.5 2.5 0 0 1 4 13.5z"/><path d="M8 12l2.2-2.6 2 1.8L15.8 8"/></svg></button>
 <div class="chatp" id="chatp"><div class="box">
@@ -1031,7 +1051,29 @@ document.addEventListener('paste',async e=>{const f=[...(e.clipboardData?.files|
   if($('#modal').classList.contains('on')){e.preventDefault();const dt=new DataTransfer();dt.items.add(f);$('#mImg').files=dt.files;$('#mImg').dispatchEvent(new Event('change'));return}
   if($('#p-ai').classList.contains('on')){setAiImg(await compressImg(f));toast('הגרף הודבק – לחץ קריאה טכנית')}
 });
-function goPage(id){$$('nav button').forEach(x=>x.classList.toggle('on',x.dataset.p===id));$$('section.page').forEach(s=>s.classList.toggle('on',s.id===id));window.scrollTo(0,0)}
+/* ===== ניווט: שישה מסכים, עם לשוניות משנה ===== */
+const GROUPS={
+  morning:[['p-morning','בוקר']],
+  trade:[['p-today','גרף ועסקה'],['p-ai','ניתוח AI'],['p-plan','תוכניות']],
+  scan:[['p-scan','סורק']],
+  port:[['p-port','פוזיציות']],
+  journal:[['p-journal','יומן ועסקאות'],['p-weekly','סיכום שבועי']],
+  news:[['p-news','חדשות'],['p-live','שידור חי']]
+};
+const PAGE_GROUP={};Object.entries(GROUPS).forEach(([g,ps])=>ps.forEach(([id])=>PAGE_GROUP[id]=g));
+const lastSub={};let chartShown=false;
+function renderSubnav(g,id){const el=$('#subnav');const ps=g&&GROUPS[g]||[];if(ps.length<2){el.style.display='none';el.innerHTML='';return}
+  el.style.display='';el.innerHTML=ps.map(([pid,lbl])=>`<button data-sub="${pid}" class="${pid===id?'on':''}">${lbl}</button>`).join('');
+  el.querySelectorAll('button').forEach(b=>b.onclick=()=>{goPage(b.dataset.sub);onEnter(b.dataset.sub)})}
+function goPage(id){const g=PAGE_GROUP[id];$$('nav button').forEach(x=>x.classList.toggle('on',x.dataset.g===g));$$('section.page').forEach(s=>s.classList.toggle('on',s.id===id));if(g)lastSub[g]=id;renderSubnav(g,id);window.scrollTo(0,0)}
+function onEnter(id){
+  if(id==='p-morning'||id==='p-port'){renderToday();refreshWatchPrices(true)}
+  if(id==='p-today'){renderToday();refreshWatchPrices(true);if(!chartShown){chartShown=true;loadChart(curSym)}}
+  if(id==='p-news'){renderNews();autoNews()}
+  if(id==='p-ai'){selectAiTicker(curSym==='BTC'?'BTC/USD':curSym);const pa=D.analyses[aiTicker];if(pa){lastAnalysis=pa;renderAnalysis(pa);$('#aiToPlan').disabled=false}}
+  if(id==='p-scan')renderScan();
+  if(id==='p-weekly')renderWeekly()}
+function navTo(g){const id=lastSub[g]||GROUPS[g][0][0];goPage(id);onEnter(id)}
 function selectAiTicker(t){aiTicker=t;let b=$$('#aiTabs button').find(x=>x.dataset.t===t);if(!b){b=$$('#aiTabs button').find(x=>x.dataset.t==='__custom'||!['MSTR','MU','BTC/USD','COIN','MARA','IBIT'].includes(x.dataset.t));b.textContent=t;b.dataset.t=t}$$('#aiTabs button').forEach(x=>x.classList.toggle('on',x===b))}
 $('#wlRefresh').onclick=()=>{toast('מרענן מחירים…');refreshWatchPrices(true)};
 $('#openTV').onclick=()=>{if(MODE==='demo'){loadChart.forceTV=!loadChart.forceTV;loadChart(curSym);if(loadChart.forceTV)toast('TradingView לצפייה – המסחר בזירה');return}window.open('https://www.tradingview.com/chart/?symbol='+encodeURIComponent(tvSym(curSym)),'_blank')};
@@ -1704,7 +1746,7 @@ async function dailyBrief(){if(briefBusy)return;briefBusy=true;try{
   D.brief={d:todayStr(),txt};await save();renderMood(LIVE['BTC'],D.trades.filter(t=>t.status!=='closed'),evCache.filter(e=>e.dd<=7),todayStats());
 }catch(e){}briefBusy=false}
 $('#qaWeekly').onclick=()=>{goPage('p-weekly');renderWeekly()};$('#qaScan').onclick=()=>{goPage('p-scan');if(!D.scan||D.scan.d!==todayStr())runScan()};$('#qaChat').onclick=()=>$('#chatFab').click();
-$('#eodBtn').onclick=async()=>{goPage('p-today');await endOfDay(true);const e=D.eod[todayStr()];if(e){e.hidden=false;renderEod()}};
+$('#eodBtn').onclick=async()=>{goPage('p-morning');await endOfDay(true);const e=D.eod[todayStr()];if(e){e.hidden=false;renderEod()}};
 $$('#p-more [data-go]').forEach(b=>b.onclick=()=>{goPage(b.dataset.go);if(b.dataset.go==='p-news'){renderNews();autoNews()}if(b.dataset.go==='p-scan')renderScan();if(b.dataset.go==='p-weekly')renderWeekly()});
 
 /* ================= סוף יום ================= */
@@ -1811,7 +1853,7 @@ function renderAction(m,a){const box=document.createElement('div');box.className
   const b=document.createElement('button');b.textContent='✔ '+lbl+(a.ticker?' '+a.ticker:'');b.onclick=async()=>{await doAction(a);b.disabled=true;b.textContent='בוצע'};box.appendChild(b);m.appendChild(box)}
 async function doAction(a){
   const pages={charts:'p-today',analysis:'p-ai',plan:'p-journal',journal:'p-journal',news:'p-news',scan:'p-scan',weekly:'p-weekly',radio:'p-today',settings:'p-set'};
-  if(a.type==='goto'){$('#chatp').classList.remove('on');goPage(pages[a.page]||'p-today');}
+  if(a.type==='goto'){$('#chatp').classList.remove('on');goPage(pages[a.page]||'p-morning');}
   if(a.type==='who'){$('#chatp').classList.remove('on');whoIs(a.ticker)}
   if(a.type==='news'){autoNews(true);toast('מרענן חדשות…')}
   if(a.type==='chart'){$('#chatp').classList.remove('on');goPage('p-today');loadChart(String(a.ticker).toUpperCase())}
@@ -1948,7 +1990,8 @@ function firstRun(manual){if(aiKey()&&S.fh)return;if(!manual&&D&&D.vault&&!(S.an
   $('#wSkip').onclick=()=>box.remove()}
 
 /* ================= ניווט ================= */
-$$('nav button').forEach(b=>b.onclick=()=>{$$('nav button').forEach(x=>x.classList.toggle('on',x===b));$$('section.page').forEach(s=>s.classList.toggle('on',s.id===b.dataset.p));if(b.dataset.p==='p-news'){renderNews();autoNews()}if(b.dataset.p==='p-today'){renderToday();refreshWatchPrices(true)}if(b.dataset.p==='p-ai'){selectAiTicker(curSym==='BTC'?'BTC/USD':curSym);const pa=D.analyses[aiTicker];if(pa){lastAnalysis=pa;renderAnalysis(pa);$('#aiToPlan').disabled=false}}if(b.dataset.p==='p-scan')renderScan();if(b.dataset.p==='p-weekly')renderWeekly()});
+$$('nav button').forEach(b=>b.onclick=()=>navTo(b.dataset.g));$('#gearBtn').onclick=()=>{goPage('p-set')};
+document.addEventListener('keydown',e=>{if(e.ctrlKey||e.metaKey||e.altKey)return;const t=e.target;if(t&&(/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)||t.isContentEditable))return;const n=/^Digit([1-6])$/.exec(e.code);if(n)navTo(Object.keys(GROUPS)[+n[1]-1])});
 $('#newsTabs').onclick=e=>{const b=e.target.closest('button');if(!b)return;$$('#newsTabs button').forEach(x=>x.classList.toggle('on',x===b));newsCat=b.dataset.c;renderNews()};
 
 function renderAll(){renderMovers();renderRules();renderEvList();renderWatch();refreshWatchPrices(true).then(()=>renderToday());renderToday();renderPlans();renderDaily();renderJournal();renderTrades();renderClosed();renderStats();renderNews()}
@@ -1958,7 +2001,7 @@ function renderAll(){renderMovers();renderRules();renderEvList();renderWatch();r
   if(D.watch&&!D.watch.some(w=>w.tape)){D.watch.slice(0,2).forEach(w=>w.tape=true)}
   if(!D.watchV||D.watchV<2){D.watch=JSON.parse(JSON.stringify(DEFAULT.watch));D.watchV=2;await save()}
   D.rules={...DEFAULT.rules,...(D.rules||{})};D.weekly=D.weekly||{};
-  loadSettingsUI();if(S.mode==='demo'){MODE='demo';document.body.classList.add('demo');$('#jModeNote').style.display='';$$('#modeSw button').forEach(b=>{b.classList.toggle('on',b.dataset.mode==='demo');b.classList.toggle('demo',b.dataset.mode==='demo')})}renderAll();loadTape();loadChart('MSTR');renderTicket();setTimeout(firstRun,800);setSync(SB?'ok':'off');
+  loadSettingsUI();if(S.mode==='demo'){MODE='demo';document.body.classList.add('demo');$('#jModeNote').style.display='';$$('#modeSw button').forEach(b=>{b.classList.toggle('on',b.dataset.mode==='demo');b.classList.toggle('demo',b.dataset.mode==='demo')})}renderAll();loadTape();curSym='MSTR';renderTicket();setTimeout(firstRun,800);setSync(SB?'ok':'off');
   if(D.analyses['MSTR']){lastAnalysis=D.analyses['MSTR'];renderAnalysis(lastAnalysis);$('#aiToPlan').disabled=false}
   startMonitor();autoNews();startNewsTimer();ibkrSync();setLive(S.liveCh||'tv10');setTimeout(()=>moversScan(true),4000);
   document.addEventListener('visibilitychange',async()=>{if(document.visibilityState==='visible'&&SB){const r=await sbGet();if(r&&(r.updatedAt||0)>(D.updatedAt||0)){D={...D,...r};await store.setLocal(D);renderAll();toast('עודכן מהענן')}}});
