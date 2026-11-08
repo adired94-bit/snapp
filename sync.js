@@ -79,6 +79,17 @@
     if (!LAST.get && SB) sbGet().then(function (data) { var a = $q('#wizAlert'); if (!a) return; if (data && data.vault) { a.textContent = 'נמצאה כספת בענן. רענן את הדף כדי להזין את הקוד.'; return; } a.textContent = why() + tail; });
   };
 
+  /* ---------- סטטוס בכותרת: ברור ולחיץ ---------- */
+  function openCheck() { goPage('p-set'); setTimeout(function () { var w = $q('#syncChkW'); if (w) w.scrollIntoView({ behavior: 'smooth', block: 'center' }); check(); }, 150); }
+  setSync = function (st) {
+    var el = $q('#sync'); if (!el) return;
+    el.textContent = st === 'ok' ? 'מסונכרן' : st === 'err' ? 'הענן לא מגיב · לחץ לבדיקה' : 'לא מסונכרן';
+    el.style.color = st === 'ok' ? 'var(--up)' : st === 'err' ? 'var(--down)' : 'var(--ink2)'; el.style.cursor = 'pointer'; el.title = 'לחץ לבדיקת סנכרון הענן'; el.onclick = openCheck;
+  };
+  var monEl = $q('#mon');
+  if (monEl) { monEl.style.cursor = 'pointer'; monEl.title = 'הפעלה וכיבוי של התראות המחיר'; monEl.onclick = function () { S.mon = !S.mon; saveS(); loadSettingsUI(); startMonitor(); toast(S.mon ? 'התראות המחיר הופעלו. הן עובדות כשהאפליקציה פתוחה' : 'התראות המחיר כבויות'); if (!S.mon) monEl.textContent = 'מוניטור כבוי · לחץ להפעלה'; }; }
+  var _sm = startMonitor; startMonitor = function () { _sm(); if (!S.mon && $q('#mon')) $q('#mon').textContent = 'מוניטור כבוי · לחץ להפעלה'; };
+
   /* ---------- בדיקת סנכרון בהגדרות ---------- */
   async function check() {
     var box = $q('#syncChk'); box.innerHTML = '<div class="dp-foot">בודק…</div>';
@@ -89,6 +100,12 @@
     if (LAST.get && LAST.get.ok) {
       add(LAST.get.rows > 0, 'יש יומן בענן', LAST.get.rows > 0 ? 'נמצא' : 'עוד לא נשמר כלום בענן');
       add(!!(data && data.vault), 'כספת מפתחות בענן', data && data.vault ? 'נשמרה ב-' + new Date(data.vault.at).toLocaleString('he-IL') : 'לא נמצאה. לחץ "שמור כספת עכשיו"');
+    }
+    if (LAST.get && LAST.get.ok) {
+      var kb = Math.round(JSON.stringify(D).length / 1024);
+      add(kb < 4000, 'גודל היומן', kb + ' KB' + (kb >= 4000 ? '. גדול מדי, ייתכן שתמונות ביומן חוסמות את השמירה' : ''));
+      await save(); /* כתיבה אמיתית של היומן, כדי לראות אם הענן מקבל */
+      add(!!(LAST.put && LAST.put.ok), 'כתיבה לענן', tell(LAST.put));
     }
     add(S.vp ? true : null, 'קוד סנכרון במכשיר הזה', S.vp ? 'מוגדר' : 'לא מוגדר. הזן קוד למעלה ושמור הגדרות');
     box.innerHTML = '<ul class="dp-gates">' + rows.join('') + '</ul>';
