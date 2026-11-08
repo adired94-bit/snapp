@@ -118,6 +118,46 @@
         ' <a href="#" data-brx="' + esc(w.id) + '" style="font-size:12px">הסר</a></div>';
     }).join('');
   }
+  /* ---------- רדאר מוקדם: מניות שמתפוצצות וקטליזטורים שבדרך (FDA, ספין-אוף, פיצול, קרב שורט, דוחות של מניות קטנות) ---------- */
+  async function loadRadar(force) {
+    if (typeof aiKey !== 'function' || !aiKey()) { ST.radar = { err: 'לרדאר צריך מפתח בינה בהגדרות.' }; paint(); return; }
+    var hit; try { hit = JSON.parse(localStorage.getItem('adir-radar') || 'null'); } catch (e) { }
+    if (hit && hit.hot && Date.now() - hit.t < 12 * 3600e3) { ST.radar = hit; paint(); }
+    if (!force && hit && Date.now() - hit.t < 30 * 60e3) return; if (ST.busy.r) return; ST.busy.r = 1; paint();
+    try {
+      var raw = await claude([{ role: 'user', content: 'היום: ' + new Date().toISOString().slice(0, 10) + '.' }], { system: 'אתה סורק מניות לסוחר יומי ישראלי שמחפש מניות לפני שהן מתפוצצות. חפש ברשת בשוק האמריקאי: (א) מניות שזינקו או קרסו בצורה קיצונית היום ובשבוע האחרון (20% ומעלה), ומה הסיבה האמיתית: חדשות, דוח, אישור FDA, מיזוג, קרב שורט, פיצול מניה, רישום מחדש או ספין-אוף. אם הזינוק נראה תוצאה של שינוי טכני (פיצול הפוך, ספין-אוף, שינוי סימול, מניה שרק התחילה להיסחר) ולא של שווי אמיתי, ציין זאת במפורש. (ב) קטליזטורים צפויים בימים הקרובים במניות קטנות ובינוניות: החלטות FDA ותאריכי PDUFA, דוחות של מניות עם עניין גבוה, ספין-אוף, פיצול מניות, הכללה במדד, מיזוג שמחכה לאישור, מניות עם שורט גבוה ופלואט נמוך. לכל פריט: סימול אמיתי בלבד, סיבה, מה לצפות, הסיכון, תאריך אם ידוע, מקור עם קישור. חוק ברזל: רק מה שמצאת בפועל עם קישור. אסור להמציא סימולים או מספרים. החזר JSON בלבד: {"summary":"שתי שורות: מה הכי חם עכשיו","hot":[{"sym":"","move":"+X% בשבוע","why":"","technical":false,"risk":"","source":"","url":""}],"upcoming":[{"sym":"","date":"YYYY-MM-DD","type":"FDA|דוח|ספין-אוף|פיצול|מדד|מיזוג|קרב שורט|אחר","why":"","setup":"מה לצפות ואיך לעקוב","risk":"","source":"","url":""}]}. עד 6 במה שזז ועד 8 בקטליזטורים.', tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }], max_tokens: 3500, tier: 'cheap' });
+      var j = parseJSON(raw), ok = function (a) { return (Array.isArray(a) ? a : []).filter(function (x) { return x && /^[A-Z.]{1,6}$/.test(x.sym || '') && /^https?:/.test(x.url || ''); }); };
+      var hot = ok(j.hot).slice(0, 6), up = ok(j.upcoming).slice(0, 8), syms = Array.from(new Set(hot.concat(up).map(function (x) { return x.sym; })));
+      var qs = {}; if (S.fh) await Promise.all(syms.map(async function (t) { try { var q = await fh('/quote?symbol=' + t); if (q && q.c > 0) qs[t] = { c: q.c, dp: q.dp }; } catch (e) { } }));
+      var tag = function (x) { x.q = qs[x.sym] || null; x.verified = !!qs[x.sym]; return x; };
+      ST.radar = { t: Date.now(), summary: j.summary || '', hot: hot.map(tag), upcoming: up.map(tag), noFh: !S.fh };
+      try { localStorage.setItem('adir-radar', JSON.stringify(ST.radar)); } catch (e) { }
+    } catch (e) { if (!ST.radar || !ST.radar.hot) ST.radar = { err: 'הרדאר נכשל: ' + e.message }; }
+    ST.busy.r = 0; paint();
+  }
+  async function loadIpo() {
+    if (!S.fh || ST.ipo) return; var d = function (x) { return x.toISOString().slice(0, 10); };
+    try { var j = await fh('/calendar/ipo?from=' + d(new Date()) + '&to=' + d(new Date(Date.now() + 14 * 864e5))); ST.ipo = ((j && j.ipoCalendar) || []).filter(function (x) { return x.symbol && x.name; }).slice(0, 10); } catch (e) { ST.ipo = []; }
+    paint();
+  }
+  function radarCard(x, kind) {
+    var q = x.q ? '<span class="' + cls(x.q.dp) + '" style="direction:ltr">' + x.q.c.toFixed(2) + ' · ' + pc(x.q.dp) + ' היום</span>' : '<span style="color:var(--ink2);font-size:12px">מחיר לא אומת</span>';
+    var big = x.technical ? '<div class="dp-regime off"><i></i><b>ייתכן שהזינוק טכני ולא אמיתי</b><span>פיצול, ספין-אוף, שינוי סימול או מניה שרק התחילה להיסחר. בדוק במקור לפני שמסיקים משהו.</span></div>' : '';
+    return '<div class="cx-i"><b><a href="#" data-brd="' + esc(x.sym) + '">' + esc(x.sym) + '</a> ' + (kind === 'hot' ? (x.move ? esc(x.move) : '') : (x.type ? '· ' + esc(x.type) : '') + (x.date ? ' · ' + esc(x.date) : '')) + '</b> ' + q + big +
+      '<p>' + esc(x.why) + '</p>' + (x.setup ? '<p class="br-ex"><b>מה לצפות:</b> ' + esc(x.setup) + '</p>' : '') + (x.risk ? '<p class="br-ex"><b>סיכון:</b> ' + esc(x.risk) + '</p>' : '') +
+      '<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.source || 'מקור') + ' ↗</a></div>';
+  }
+  function radarHtml() {
+    var r = ST.radar, out = '';
+    if (ST.busy.r && !(r && r.hot)) return '<div class="dp-skel"><i style="height:120px"></i></div><div class="dp-foot">סורק ברשת מניות שמתפוצצות וקטליזטורים בדרך. לוקח כחצי דקה.</div>';
+    if (!r) return '<div class="dp-empty">טוען…</div>'; if (r.err) return '<div class="dp-empty">' + esc(r.err) + '</div>';
+    if (r.summary) out += '<div class="dp-regime"><i></i><b>' + esc(r.summary) + '</b></div>';
+    out += '<h4 class="cx-h">זזו חזק עכשיו <small><a href="#" data-brf="radar">רענן</a></small></h4>' + (r.hot.length ? r.hot.map(function (x) { return radarCard(x, 'hot'); }).join('') : '<div class="dp-empty">לא נמצאו.</div>');
+    out += '<h4 class="cx-h">קטליזטורים בדרך</h4>' + (r.upcoming.length ? r.upcoming.map(function (x) { return radarCard(x, 'up'); }).join('') : '<div class="dp-empty">לא נמצאו.</div>');
+    out += '<h4 class="cx-h">הנפקות בשבועיים הקרובים</h4>' + (ST.ipo && ST.ipo.length ? '<div class="cx-t">' + ST.ipo.map(function (x) { return '<div class="cx-r" style="grid-template-columns:1.6fr 1fr 1fr"><span>' + esc(x.name) + ' <small>' + esc(x.symbol) + '</small></span><span>' + esc(x.date || '') + '</span><span>' + (x.price ? esc(x.price) : '–') + '</span></div>'; }).join('') + '</div>' : '<div class="dp-empty">' + (S.fh ? 'אין הנפקות מתועדות.' : 'צריך מפתח Finnhub.') + '</div>');
+    out += '<div class="dp-foot" style="text-align:right">מחקר ברשת נכון ל-' + hm(r.t) + (ST.busy.r ? ' · מתעדכן ברקע…' : '') + '. מניות כאלה תנודתיות מאוד, ולא מומלץ לרדוף אחרי זינוק שכבר קרה. הסימולים נבדקו מול Finnhub ("מחיר לא אומת" אומר שלא נמצא מחיר). לא ייעוץ השקעות.</div>';
+    return out;
+  }
   /* שעון מסחר: מתי וול סטריט נפתחת בישראל, באיזו שלב אנחנו, וכמה זמן נשאר לכלל 15 הדקות */
   function nyAt(h, m) {
     var f = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false, minute: '2-digit' }), p = {}, now = new Date();
@@ -146,20 +186,20 @@
   function paint() {
     var host = $q('#brBody'); if (!host) return;
     $q('#brTabs').querySelectorAll('button').forEach(function (b) { b.classList.toggle('on', b.dataset.t === ST.tab); });
-    host.innerHTML = ST.tab === 'market' ? marketHtml() : ST.tab === 'cal' ? calHtml() : ST.tab === 'clock' ? clockHtml() : newsHtml();
+    host.innerHTML = ST.tab === 'market' ? marketHtml() : ST.tab === 'cal' ? calHtml() : ST.tab === 'clock' ? clockHtml() : ST.tab === 'radar' ? radarHtml() : newsHtml();
     host.querySelectorAll('[data-brd]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); window.openDeep(a.dataset.brd); }; });
     host.querySelectorAll('[data-brw]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); addWatch(a.dataset.brw); }; });
     host.querySelectorAll('[data-brx]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); D.evWatch = (D.evWatch || []).filter(function (w) { return w.id !== a.dataset.brx; }); save(); paint(); }; });
-    host.querySelectorAll('[data-brf]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); if (a.dataset.brf === 'cal') loadCal(true); else window.__wire.load(true).then(paint); }; });
+    host.querySelectorAll('[data-brf]').forEach(function (a) { a.onclick = function (e) { e.preventDefault(); if (a.dataset.brf === 'cal') loadCal(true); else if (a.dataset.brf === 'radar') loadRadar(true); else window.__wire.load(true).then(paint); }; });
   }
-  function show(t) { ST.tab = t; clearInterval(ST.iv); if (t === 'clock') ST.iv = setInterval(function () { if ($q('#p-brief.on') && ST.tab === 'clock') paint(); }, 30e3); if (t === 'market') loadMarket(); else if (t === 'cal') { loadEarn(); if (!ST.cal) loadCal(); } else { if (window.__hot) window.__hot.refresh(); if (window.__wire) window.__wire.load(false); setTimeout(paint, 1500); } paint(); }
+  function show(t) { ST.tab = t; clearInterval(ST.iv); if (t === 'clock') ST.iv = setInterval(function () { if ($q('#p-brief.on') && ST.tab === 'clock') paint(); }, 30e3); if (t === 'market') loadMarket(); else if (t === 'radar') { loadRadar(); loadIpo(); } else if (t === 'cal') { loadEarn(); if (!ST.cal) loadCal(); } else { if (window.__hot) window.__hot.refresh(); if (window.__wire) window.__wire.load(false); setTimeout(paint, 1500); } paint(); }
   function build() {
     if ($q('#p-brief')) return;
     var s = document.createElement('section'); s.className = 'page'; s.id = 'p-brief';
-    s.innerHTML = '<div class="tabs" id="brTabs" style="margin:6px 0 10px"><button data-t="market">שוק</button><button data-t="cal">יומן ודוחות</button><button data-t="news">חדשות ומובילות</button><button data-t="clock">שעון מסחר</button></div><div class="dp-card"><div id="brBody"></div></div>';
+    s.innerHTML = '<div class="tabs" id="brTabs" style="margin:6px 0 10px"><button data-t="market">שוק</button><button data-t="cal">יומן ודוחות</button><button data-t="radar">רדאר</button><button data-t="news">חדשות ומובילות</button><button data-t="clock">שעון מסחר</button></div><div class="dp-card"><div id="brBody"></div></div>';
     document.querySelector('main').appendChild(s);
     $q('#brTabs').querySelectorAll('button').forEach(function (b) { b.onclick = function () { show(b.dataset.t); }; });
-    window.__briefShow = function () { var t = new URLSearchParams(location.search).get('tab'); show(t && ['market', 'cal', 'news', 'clock'].indexOf(t) >= 0 && !ST.opened ? t : ST.tab); ST.opened = 1; };
+    window.__briefShow = function () { var t = new URLSearchParams(location.search).get('tab'); show(t && ['market', 'cal', 'radar', 'news', 'clock'].indexOf(t) >= 0 && !ST.opened ? t : ST.tab); ST.opened = 1; };
   }
   build();
   /* טעינה מוקדמת ברקע ביום מסחר, כדי שהיומן יהיה מוכן כשפותחים את הלשונית */
