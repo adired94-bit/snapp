@@ -1,157 +1,24 @@
 /* מנוע ניתוח משותף עם AlphaTerminal Pro: אינדיקטורים, תבניות נרות, אזורים, שקלול רב-טווחי, לקוח נתונים ושערי הסשן */
-// AlphaTerminal Pro - ליבת חישוב (שלב ראשון). בלי תלות בדפדפן, כדי שאפשר יהיה לבדוק אותה.
+// ליבה: מצבי עבודה, קבוצות מתואמות וחישוב סטופ ויעדים לפי ATR.
 (function (root) {
   var MODES = {
     day:   { label: 'יומי',       interval: '5min',  mult: 1.25, riskPct: 0.5 },
     swing: { label: 'סווינג',     interval: '1day',  mult: 1.5,  riskPct: 1 },
     long:  { label: 'טווח ארוך',  interval: '1week', mult: 2.5,  riskPct: 1 }
   };
-
-  var DEFAULTS = {
-    equity: 0, dailyCapR: 2, weeklyCapR: 5, tiltMinutes: 30, revengeMinutes: 2,
-    groupLimitPct: 1.5, totalLimitPct: 3, minRR: 2
-  };
-
   // נכסים שזזים יחד נחשבים כקבוצה אחת לחשיפה מצטברת
   var GROUPS = { 'ביטקוין': ['MSTR', 'COIN', 'MARA', 'IBIT', 'RIOT', 'CLSK', 'FBTC', 'GBTC', 'BTC', 'BTC/USD'] };
-
   function groupOf(sym) {
     sym = String(sym || '').toUpperCase().trim();
     for (var g in GROUPS) { if (GROUPS[g].indexOf(sym) >= 0) return g; }
     return sym;
   }
-
-  // bars: מהישן לחדש, כל אחד {h,l,c}. החלקת וילדר.
-  function atr(bars, p) {
-    p = p || 14;
-    if (!bars || bars.length < p + 1) return null;
-    var tr = [];
-    for (var i = 1; i < bars.length; i++) {
-      var b = bars[i], pc = bars[i - 1].c;
-      tr.push(Math.max(b.h - b.l, Math.abs(b.h - pc), Math.abs(b.l - pc)));
-    }
-    var a = 0;
-    for (var j = 0; j < p; j++) a += tr[j];
-    a /= p;
-    for (var k = p; k < tr.length; k++) a = (a * (p - 1) + tr[k]) / p;
-    return a;
-  }
-
   // סטופ במרחק כפולת ATR, יעד ראשון 2R ושני 3R
   function levels(dir, entry, atrV, mult) {
     var d = dir === 'short' ? -1 : 1, risk = atrV * mult;
     return { stop: entry - d * risk, t1: entry + d * 2 * risk, t2: entry + d * 3 * risk };
   }
-
-  function size(equity, riskPct, entry, stop) {
-    var per = Math.abs(entry - stop);
-    if (!(equity > 0) || !(per > 0) || !(riskPct > 0)) return { qty: 0, riskUsd: 0, budget: 0, perShare: per || 0 };
-    var budget = equity * riskPct / 100;
-    var qty = Math.floor(budget / per);
-    return { qty: qty, riskUsd: qty * per, budget: budget, perShare: per };
-  }
-
-  function rMultiple(t, exit) {
-    var d = t.dir === 'short' ? -1 : 1, risk = Math.abs(t.entry - t.stop);
-    return risk > 0 ? d * (exit - t.entry) / risk : 0;
-  }
-
-  function startOfDay(ms) { var d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); }
-  function startOfWeek(ms) { // שבוע מסחר מתחיל ביום שני
-    var d = new Date(startOfDay(ms)), day = d.getDay(); // 0=ראשון
-    var back = day === 0 ? 6 : day - 1;
-    d.setDate(d.getDate() - back);
-    return d.getTime();
-  }
-
-  function sumR(closed, from) {
-    var s = 0;
-    for (var i = 0; i < closed.length; i++) if (closed[i].closedAt >= from) s += closed[i].r || 0;
-    return s;
-  }
-
-  // מצב סיכון: נעילות והתראות לפי העסקאות שנסגרו
-  function riskState(trades, now, s) {
-    s = Object.assign({}, DEFAULTS, s || {});
-    var closed = trades.filter(function (t) { return t.closedAt; })
-      .sort(function (a, b) { return a.closedAt - b.closedAt; });
-    var dayStart = startOfDay(now), weekStart = startOfWeek(now);
-    var dayR = sumR(closed, dayStart), weekR = sumR(closed, weekStart);
-    var out = { locked: false, reason: '', until: 0, dayR: dayR, weekR: weekR, warns: [] };
-
-    function lock(reason, until) {
-      if (!out.locked || until > out.until) { out.locked = true; out.reason = reason; out.until = until; }
-    }
-
-    if (dayR <= -s.dailyCapR) lock('תקרת ההפסד היומית הושגה (' + dayR.toFixed(2) + 'R)', dayStart + 86400000);
-    else if (dayR <= -0.8 * s.dailyCapR) out.warns.push('ההפסד היומי הגיע ל-80% מהתקרה');
-
-    if (weekR <= -s.weeklyCapR) {
-      var wk = new Date(weekStart); wk.setDate(wk.getDate() + 7);
-      lock('תקרת ההפסד השבועית הושגה (' + weekR.toFixed(2) + 'R)', wk.getTime());
-    }
-
-    var today = closed.filter(function (t) { return t.closedAt >= dayStart; });
-    var last = today[today.length - 1], prev = today[today.length - 2];
-    if (last && prev && last.r < 0 && prev.r < 0) {
-      var until = last.closedAt + s.tiltMinutes * 60000;
-      if (now < until) lock('שני סטופים ברצף: הפסקה של ' + s.tiltMinutes + ' דקות', until);
-    }
-    if (last && last.r < 0) {
-      var u2 = last.closedAt + s.revengeMinutes * 60000;
-      if (now < u2) lock('עסקה חדשה מיד אחרי הפסד: המתן ' + s.revengeMinutes + ' דקות', u2);
-    }
-
-    var guessesToday = trades.filter(function (t) { return t.openedAt >= dayStart && t.guess; }).length;
-    if (guessesToday >= 3) out.warns.push('שלוש כניסות מסומנות כניחוש היום: בדוק את הסט-אפ לפני הבאה');
-    return out;
-  }
-
-  function openRisk(trades, group) {
-    var s = 0;
-    trades.forEach(function (t) {
-      if (t.closedAt) return;
-      if (group && groupOf(t.sym) !== group) return;
-      s += t.riskUsd || 0;
-    });
-    return s;
-  }
-
-  // שערי כניסה: הכפתור נפתח רק כשכולם עוברים
-  function gates(inp) {
-    var s = Object.assign({}, DEFAULTS, inp.settings || {});
-    var d = inp.dir === 'short' ? -1 : 1;
-    var e = +inp.entry, st = +inp.stop, t1 = +inp.t1;
-    var list = [];
-    function add(ok, label, detail) { list.push({ ok: !!ok, label: label, detail: detail || '' }); }
-
-    var stopOk = e > 0 && st > 0 && (e - st) * d > 0;
-    add(stopOk, 'סטופ מוגדר ובצד הנכון', stopOk ? '' : (inp.dir === 'short' ? 'בשורט הסטופ מעל הכניסה' : 'בלונג הסטופ מתחת לכניסה'));
-    var t1Ok = e > 0 && t1 > 0 && (t1 - e) * d > 0;
-    add(t1Ok, 'יעד ראשון מוגדר ובצד הנכון', t1Ok ? '' : 'חסר יעד או שהוא בכיוון הלא נכון');
-    var rr = stopOk && t1Ok ? Math.abs(t1 - e) / Math.abs(e - st) : 0;
-    // עיגול לשתי ספרות, כדי שיעד של 2R שעבר עיגול מחיר לא ייחסם בטעות
-    add(Math.round(rr * 100) / 100 >= s.minRR, 'יחס סיכוי לסיכון לפחות ' + s.minRR, 'כרגע ' + rr.toFixed(2));
-    add(inp.guess || (inp.setup && inp.setup.length > 0), 'נבחר סט-אפ או סומן ניחוש', inp.guess ? 'הכניסה תיספר כניחוש ביומן' : '');
-    add(inp.emotion >= 1 && inp.emotion <= 5, 'דורג מצב רגשי');
-    var sz = size(s.equity, inp.riskPct, e, st);
-    add(s.equity > 0 && sz.qty >= 1, 'הוזן הון והכמות המחושבת לפחות 1', s.equity > 0 ? (sz.qty < 1 ? 'הסטופ רחוק מדי לתקציב הסיכון' : '') : 'הזן הון בהגדרות');
-
-    var rs = inp.risk;
-    add(!rs.locked, 'אין נעילת סיכון פעילה', rs.locked ? rs.reason : '');
-
-    var grp = groupOf(inp.sym);
-    var gRisk = openRisk(inp.trades || [], grp) + sz.riskUsd;
-    var tRisk = openRisk(inp.trades || [], null) + sz.riskUsd;
-    var gMax = s.equity * s.groupLimitPct / 100, tMax = s.equity * s.totalLimitPct / 100;
-    add(s.equity > 0 && gRisk <= gMax + 1e-9, 'חשיפה לקבוצה "' + grp + '" בגבול ' + s.groupLimitPct + '%', 'סיכון מצטבר ' + gRisk.toFixed(0) + ' מתוך ' + gMax.toFixed(0));
-    add(s.equity > 0 && tRisk <= tMax + 1e-9, 'סיכון פתוח כולל בגבול ' + s.totalLimitPct + '%', 'סיכון מצטבר ' + tRisk.toFixed(0) + ' מתוך ' + tMax.toFixed(0));
-
-    return { items: list, ok: list.every(function (x) { return x.ok; }), rr: rr, size: sz };
-  }
-
-  var api = { MODES: MODES, DEFAULTS: DEFAULTS, groupOf: groupOf, atr: atr, levels: levels, size: size,
-    rMultiple: rMultiple, riskState: riskState, openRisk: openRisk, gates: gates, startOfDay: startOfDay, startOfWeek: startOfWeek };
+  var api = { MODES: MODES, groupOf: groupOf, levels: levels };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.AT = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 

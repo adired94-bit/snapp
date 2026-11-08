@@ -24,6 +24,5 @@
   }
   build();
   GROUPS.scan.splice(0, 0, ['p-mkt', 'שוק']); PAGE_GROUP['p-mkt'] = 'scan';
-  GROUPS.scan.forEach(function (x) { if (x[0] === 'p-scan') x[1] = 'פריצות'; });
   var _e = onEnter; onEnter = function (id) { _e(id); if (id === 'p-mkt') window.__mkShow(); };
 })();

@@ -168,10 +168,6 @@ body.demo header{margin-top:22px}
 .rule input{width:80px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;color:var(--ink);font:inherit;padding:6px;direction:ltr;text-align:center}
 .rule .st{font-size:12px}
 .rule.broken{color:var(--down)}
-.scan-row{padding:10px 4px;border-bottom:1px solid var(--line)}.scan-row:last-child{border:0}
-.scan-row .h{display:flex;justify-content:space-between;align-items:center}.scan-row .h b{font-size:16px}
-.scan-row .why{font-size:13px;color:var(--ink2);margin-top:3px}
-.scan-row .setup{margin-top:6px}
 /* צ'אט */
 .fab{position:fixed;left:16px;bottom:calc(76px + env(safe-area-inset-bottom));width:54px;height:54px;border-radius:50%;background:linear-gradient(135deg,#FFD37A,#F2A93B);border:0;box-shadow:0 8px 24px rgba(242,169,59,.35),0 2px 6px rgba(0,0,0,.4);z-index:15;display:grid;place-items:center;transition:transform .15s}.fab:hover{transform:scale(1.06)}
 .chatp{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:none;align-items:flex-end;justify-content:center}.chatp.on{display:flex}
@@ -413,8 +409,6 @@ body.demo header{margin-top:22px}
     
       <h2>קפיצות חדות <small id="moversT"></small></h2>
       <div class="card" id="moversBox" style="max-height:26vh;overflow-y:auto"><div class="empty">סורק את כל הרשימות כל 5 דק' בשעות המסחר. מניה שזזה ±10% נכנסת, ירדה מתחת – יוצאת.</div></div>
-      <h2>הסורק היום <small id="scanMiniT"></small><button class="btn ghost small" id="scanMiniRun">סרוק</button></h2>
-      <div class="card" id="scanMini"></div>
       
     
       <h2>פעילות אחרונה</h2>
@@ -452,13 +446,6 @@ body.demo header{margin-top:22px}
 </section>
 
 <!-- שידור חי -->
-
-<!-- סורק -->
-<section class="page" id="p-scan">
-  <h2>סורק הזדמנויות <small id="scanT"></small><button class="btn small" id="scanRun">סרוק עכשיו</button></h2>
-  <div class="hint" style="margin:0 4px 8px">עובר על כל המניות ברשימות שלך: תנועה חריגה, פריצה/שבירה של 20 יום, קרבה לתמיכה/התנגדות. מציג עד 6. לחיצה → ניתוח.</div>
-  <div class="card" id="scanOut"><div class="empty">עוד לא נסרק היום.</div></div>
-</section>
 
 <!-- סיכום שבועי -->
 <section class="page" id="p-weekly">
@@ -1068,7 +1055,7 @@ document.addEventListener('paste',async e=>{const f=[...(e.clipboardData?.files|
 const GROUPS={
   morning:[['p-morning','בית']],
   trade:[['p-today','גרף'],['p-ai','מתמונה'],['p-plan','תוכניות']],
-  scan:[['p-scan','סורק']],
+  scan:[['p-smart','סריקה']],
   port:[['p-port','פוזיציות']],
   journal:[['p-journal','יומן'],['p-weekly','סיכום שבועי']],
   news:[['p-news','חדשות']]
@@ -1084,7 +1071,6 @@ function onEnter(id){
   if(id==='p-today'){renderToday();refreshWatchPrices(true);if(!chartShown){chartShown=true;loadChart(curSym)}}
   if(id==='p-news'){renderNews();autoNews()}
   if(id==='p-ai'){selectAiTicker(curSym==='BTC'?'BTC/USD':curSym);const pa=D.analyses[aiTicker];if(pa){lastAnalysis=pa;renderAnalysis(pa);$('#aiToPlan').disabled=false}}
-  if(id==='p-scan')renderScan();
   if(id==='p-weekly')renderWeekly()}
 function navTo(g){const id=lastSub[g]||GROUPS[g][0][0];goPage(id);onEnter(id)}
 function selectAiTicker(t){aiTicker=t;let b=$$('#aiTabs button').find(x=>x.dataset.t===t);if(!b){b=$$('#aiTabs button').find(x=>x.dataset.t==='__custom'||!['MSTR','MU','BTC/USD','COIN','MARA','IBIT'].includes(x.dataset.t));b.textContent=t;b.dataset.t=t}$$('#aiTabs button').forEach(x=>x.classList.toggle('on',x===b))}
@@ -1687,15 +1673,10 @@ $('#tnRefresh').onclick=()=>autoNews(true);
 /* ================= עמודה שמאלית: מדדים, סורק, פעילות ================= */
 const IDX=[['SPY','S&P'],['QQQ','נאסדק'],['IWM','ראסל'],['VIX','פחד']];
 async function renderIdx(){const paint=P=>{$('#idxBox').innerHTML=IDX.map(([t,n])=>{const q=(P&&P[t])||LIVE[t];return `<div style="text-align:center;background:var(--panel2);border-radius:8px;padding:6px 4px"><div class="hint" style="font-size:11px">${n}</div><b style="direction:ltr;display:block;font-size:14px">${q?fmt(q.price):'–'}</b><small style="color:${q&&q.chg>=0?'var(--up)':'var(--down)'};direction:ltr;display:block">${q&&q.chg!=null?(q.chg>0?'+':'')+(+q.chg).toFixed(2)+'%':''}</small></div>`}).join('')};paint(null);try{paint(await fetchPrices(IDX.map(x=>x[0])))}catch(e){}}
-function renderScanMini(){const sc=D.scan;const box=$('#scanMini');if(!sc||sc.d!==todayStr()||!sc.items||!sc.items.length){box.innerHTML='<div class="empty">עוד לא נסרק היום.</div>';$('#scanMiniT').textContent='';return}
-  $('#scanMiniT').textContent=new Date(sc.t).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
-  box.innerHTML=sc.items.slice(0,3).map(i=>`<div class="mv" data-an="${i.ticker}"><span><b>${i.ticker}</b> <span class="pill ${i.grade==='A'?'win':i.grade==='B'?'open':''}">${i.grade}</span><br><small>${(i.setup||'').slice(0,70)}</small></span><span class="hint">נתח →</span></div>`).join('');
-  $$('#scanMini [data-an]').forEach(el=>el.onclick=()=>{selectAiTicker(el.dataset.an);goPage('p-ai');runAnalysis(true)})}
 function renderRecent(){const ev=[];TR().forEach(t=>t.log.forEach(e=>{if(!(e.type==='עריכה'&&/^ללא/.test(e.note||'')))ev.push({t:e.t,txt:`${t.ticker} · ${e.type}${e.price?' @ '+fmt(e.price):''}`,sub:(e.note||'').slice(0,60)})}));
   D.journal.forEach(j=>ev.push({t:j.t,txt:`${j.ticker} · ${ACT[j.action]||j.action}${j.price?' @ '+fmt(j.price):''}`,sub:(j.note||'').slice(0,60)}));
   (D.alerts||[]).slice(-5).forEach(a=>ev.push({t:a.t,txt:'🔔 '+a.msg.slice(0,50)}));if(D.news)ev.push({t:D.news.t,txt:'📰 חדשות עודכנו'});
   ev.sort((a,b)=>b.t-a.t);$('#recentBox').innerHTML=ev.slice(0,8).map(e=>`<div class="row2" style="padding:5px 4px"><span style="font-size:13px"><b style="font-weight:600">${e.txt}</b>${e.sub?`<br><small style="color:var(--ink2)">${e.sub}</small>`:''}</span><small class="hint" style="direction:ltr">${new Date(e.t).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small></div>`).join('')||'<div class="empty">עוד אין פעילות.</div>'}
-$('#scanMiniRun').onclick=()=>{goPage('p-scan');runScan()};
 
 /* ================= קפיצות 10% ================= */
 let mvLast=0;
@@ -1733,7 +1714,7 @@ async function renderToday(){
   $('#todayRules').innerHTML=ruleStatus().map(x=>`<div class="rule ${x.broken?'broken':''}"><span>${x.broken?'⛔ ':'✓ '}${x.txt}</span></div>`).join('');
   evCache=await allEvents();const ev7=evCache.filter(e=>e.dd<=7);const mine=new Set(T.map(t=>t.ticker));
   $('#todayEvents').innerHTML=ev7.length?ev7.map(e=>`<div class="ev ${e.dd<=1?'soon':''} ${e.tk&&mine.has(e.tk)?'pos':''}"><span class="d">${e.dd===0?'היום':e.dd===1?'מחר':'בעוד '+e.dd+' ימים'}</span><span style="flex:1">${e.name}${e.tk&&mine.has(e.tk)?' <b style="color:var(--btc)">– יש לך פוזיציה!</b>':''}</span><small class="hint">${e.date.slice(5)}</small></div>`).join(''):'<div class="empty">שבוע שקט – אין דוחות או פד.</div>';
-  renderTodayNews();loadRSS();renderIdx();renderScanMini();renderRecent();renderLesson();
+  renderTodayNews();loadRSS();renderIdx();renderRecent();renderLesson();
   const ny0=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));if(ny0.getHours()>=16||ny0.getDay()===0||ny0.getDay()===6)endOfDay();const eo=(D.eod||{})[todayStr()];if(eo&&!eo.hidden)renderEod();
   renderMood(btc,T,ev7,st);
 }
@@ -1760,7 +1741,6 @@ async function dailyBrief(){if(briefBusy)return;briefBusy=true;try{
 }catch(e){}briefBusy=false}
 $('#qaWeekly').onclick=()=>{goPage('p-weekly');renderWeekly()};$('#qaScan').onclick=()=>{goPage('p-smart');onEnter('p-smart')};$('#qaChat').onclick=()=>$('#chatFab').click();
 $('#eodBtn').onclick=async()=>{goPage('p-morning');await endOfDay(true);const e=D.eod[todayStr()];if(e){e.hidden=false;renderEod()}};
-$$('#p-more [data-go]').forEach(b=>b.onclick=()=>{goPage(b.dataset.go);if(b.dataset.go==='p-news'){renderNews();autoNews()}if(b.dataset.go==='p-scan')renderScan();if(b.dataset.go==='p-weekly')renderWeekly()});
 
 /* ================= סוף יום ================= */
 async function endOfDay(force){
@@ -1778,26 +1758,6 @@ function renderEod(){const d=todayStr();const e=(D.eod||{})[d];const box=$('#eod
 setInterval(()=>{const ny=new Date(new Date().toLocaleString('en-US',{timeZone:'America/New_York'}));if(ny.getDay()>=1&&ny.getDay()<=5&&ny.getHours()===16&&ny.getMinutes()<3)endOfDay()},60e3);
 
 /* ================= סורק ================= */
-async function runScan(){
-  const btn=$('#scanRun');btn.disabled=true;btn.textContent='סורק…';$('#scanOut').innerHTML='<div class="empty"><span class="spin"></span> שלב 1: מחירים לכל הרשימות…</div>';
-  try{
-    const syms=[...new Set(D.watch.flatMap(w=>w.items))].filter(t=>t!=='BTC');if(!S.fh)throw new Error('צריך מפתח Finnhub');
-    const P={};for(let i=0;i<syms.length;i+=10){Object.assign(P,await fetchPrices(syms.slice(i,i+10)));await new Promise(r=>setTimeout(r,350));$('#scanOut').innerHTML=`<div class="empty"><span class="spin"></span> שלב 1: ${Math.min(i+10,syms.length)}/${syms.length}</div>`}
-    const c1=Object.entries(P).map(([t,q])=>{const rng=q.high-q.low||1;const posInDay=(q.price-q.low)/rng;const gap=q.prev?(q.open-q.prev)/q.prev*100:0;let score=Math.abs(q.chg||0);if(posInDay>0.9||posInDay<0.1)score+=2;if(Math.abs(gap)>2)score+=2;return {t,q,score,posInDay,gap}}).sort((a,b)=>b.score-a.score).slice(0,S.td?6:8);
-    let enriched=[];
-    if(S.td){for(let i=0;i<c1.length;i++){const c=c1[i];$('#scanOut').innerHTML=`<div class="empty"><span class="spin"></span> שלב 2: נרות ${c.t} (${i+1}/${c1.length})</div>`;const v=await fetchSeries(c.t,'1day',30);if(v){const hi20=Math.max(...v.slice(-21,-1).map(r=>r[2])),lo20=Math.min(...v.slice(-21,-1).map(r=>r[3]));const x=c.q.price;c.hi20=hi20;c.lo20=lo20;c.brk=x>hi20?'פריצת 20 יום':x<lo20?'שבירת 20 יום':'';c.nearHi=(hi20-x)/x*100;c.nearLo=(x-lo20)/x*100;const vol=v.slice(-1)[0][5],avg=v.slice(-11,-1).reduce((a,r)=>a+r[5],0)/10;c.volX=avg?vol/avg:1}enriched.push(c);if(i<c1.length-1)await new Promise(r=>setTimeout(r,8000))}}
-    else enriched=c1;
-    $('#scanOut').innerHTML='<div class="empty"><span class="spin"></span> שלב 3: מסקנות…</div>';
-    const txt=enriched.map(c=>`${c.t}: מחיר ${fmt(c.q.price)} (${c.q.chg>0?'+':''}${(+c.q.chg||0).toFixed(1)}%), טווח יומי ${fmt(c.q.low)}-${fmt(c.q.high)}, גאפ ${c.gap.toFixed(1)}%${c.hi20?`, שיא 20 יום ${fmt(c.hi20)}, שפל 20 יום ${fmt(c.lo20)}, ${c.brk||'בתוך הטווח'}, ווליום x${(c.volX||1).toFixed(1)}`:''}`).join('\n');
-    const raw=await claude([{role:'user',content:`מועמדים מהסריקה היומית:\n${txt}\nBTC ${LIVE['BTC']?.price||'?'}.\nהחזר JSON בלבד: {"items":[{"ticker":"","grade":"A|B|C","why":"משפט: מה קרה ולמה מעניין","setup":"לונג/שורט/המתנה + כניסה, סטופ, יעד במספרים או 'חכה ל…'"}]} מסודר לפי איכות, עד 6, בלי להמציא מספרים שלא קיבלת.`}],{system:'אתה סורק מסחר בשיטת Price Action. עברית, קצר, מספרים בלבד מהנתונים.',max_tokens:1200,tier:'mid'});
-    const j=parseJSON(raw);D.scan={d:todayStr(),t:Date.now(),items:j.items||[]};await save();renderScan();renderScanMini();
-  }catch(e){$('#scanOut').innerHTML=`<div class="empty" style="color:var(--down)">${e.message}</div>`}
-  btn.disabled=false;btn.textContent='סרוק עכשיו';
-}
-function renderScan(){const sc=D.scan;if(!sc||!sc.items)return;$('#scanT').textContent=new Date(sc.t).toLocaleString('he-IL',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-  $('#scanOut').innerHTML=sc.items.map(i=>`<div class="scan-row"><div class="h"><b><span data-who="${i.ticker}" style="cursor:pointer" title="מי החברה?">${i.ticker} ℹ</span> <span class="pill ${i.grade==='A'?'win':i.grade==='B'?'open':''}">${i.grade}</span></b><button class="btn ghost small" data-an="${i.ticker}">נתח →</button></div><div class="why">${i.why||''}</div><div class="setup" style="font-size:14px">${i.setup||''}</div></div>`).join('')||'<div class="empty">לא נמצא כלום מעניין היום.</div>';
-  $$('#scanOut [data-an]').forEach(b=>b.onclick=()=>{selectAiTicker(b.dataset.an);goPage('p-ai');runAnalysis(true)});$$('#scanOut [data-who]').forEach(b=>b.onclick=()=>whoIs(b.dataset.who))}
-$('#scanRun').onclick=runScan;
 
 /* ================= סיכום שבועי ================= */
 const weekKey=()=>{const d=new Date();const day=(d.getDay()+1)%7;const sun=new Date(d);sun.setDate(d.getDate()-day);return sun.toISOString().slice(0,10)};
@@ -1837,7 +1797,7 @@ function chatCtx(){
   const ck=(D.stockChecks||{})[curSym];const ckt=ck&&ck.verdict?`צ'ק ליסט ${curSym}: ${ck.verdict.title} (${ck.verdict.why})`:'';
   const nw=(D.news&&D.news.items||[]).slice(0,8).map(i=>`- ${i.ticker||i.cat}: ${i.title}`).join('\n');
   const an=Object.entries(D.analyses).slice(-3).map(([k,a])=>`${k}: ${a.bottom_line||a.summary||''}`).join('\n');
-  const comp=Object.entries(D.company||{}).slice(-6).map(([k,c])=>`${k}: ${(c.what||'').slice(0,120)}`).join('\n');const rs=ruleStatus().map(x=>x.txt).join(', ');const sc=(D.scan&&D.scan.d===todayStr())?D.scan.items.map(i=>`${i.ticker} ${i.grade}: ${i.setup}`).join('; '):'';
+  const comp=Object.entries(D.company||{}).slice(-6).map(([k,c])=>`${k}: ${(c.what||'').slice(0,120)}`).join('\n');const rs=ruleStatus().map(x=>x.txt).join(', ');const sc=(window.__scan&&window.__scan.state.report&&window.__scan.state.report.rows.length&&new Date(window.__scan.state.report.at).toDateString()===new Date().toDateString())?window.__scan.state.report.rows.slice(0,10).map(i=>`${i.sym} ${i.dir==='long'?'לונג':'שורט'} ${i.comp}/100`).join('; '):'';
   return `הקשר (${new Date().toLocaleString('he-IL')}, וול סטריט ${usMarketOpen()?'פתוח':'סגור'}):\nמחירים: ${px||'אין'}\nחוקים היום: ${rs}\n${sc?'סורק היום: '+sc+'\n':''}${comp?'פרופילי חברות שנטענו:\n'+comp+'\n':''}\nפוזיציות/פקודות: ${tr||'אין'}\nגרף פתוח: ${curSym}. ${ckt}\nחדשות אחרונות:\n${nw||'אין'}\nניתוחים אחרונים:\n${an||'אין'}\nסיכון קבוע לעסקה: $${S.risk||'?'}, תיק $${S.acct||'?'}.`;
 }
 function addMsg(role,text,img){const m=document.createElement('div');m.className='msg '+(role==='user'?'u':'a');const body=text.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');m.innerHTML=(img?`<img src="data:image/jpeg;base64,${img}">`:'')+(role==='user'?body:teach(body));$('#msgs').appendChild(m);$('#msgs').scrollTop=1e9;return m}
@@ -1865,7 +1825,7 @@ async function chatSend(){
 function renderAction(m,a){const box=document.createElement('div');box.className='act';const lbl={goto:'עבור לעמוד',note:'רשום ביומן',order:'צור פקודה ממתינה',analyze:'הרץ קריאה טכנית',chart:'פתח גרף',watch:'הוסף לרשימת מעקב',who:'מי החברה',news:'רענן חדשות'}[a.type];if(!lbl)return;
   const b=document.createElement('button');b.textContent='✔ '+lbl+(a.ticker?' '+a.ticker:'');b.onclick=async()=>{await doAction(a);b.disabled=true;b.textContent='בוצע'};box.appendChild(b);m.appendChild(box)}
 async function doAction(a){
-  const pages={charts:'p-today',analysis:'p-ai',plan:'p-journal',journal:'p-journal',news:'p-news',scan:'p-scan',weekly:'p-weekly',radio:'p-today',settings:'p-set'};
+  const pages={charts:'p-today',analysis:'p-ai',plan:'p-journal',journal:'p-journal',news:'p-news',scan:'p-smart',weekly:'p-weekly',radio:'p-today',settings:'p-set'};
   if(a.type==='goto'){$('#chatp').classList.remove('on');goPage(pages[a.page]||'p-morning');}
   if(a.type==='who'){$('#chatp').classList.remove('on');whoIs(a.ticker)}
   if(a.type==='news'){autoNews(true);toast('מרענן חדשות…')}

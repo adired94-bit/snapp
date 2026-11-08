@@ -348,7 +348,7 @@
     $q('#scDiagGo').onclick = diagnose;
   }
   build();
-  GROUPS.scan = GROUPS.scan.filter(function (x) { return x[0] !== 'p-smart' && x[0] !== 'p-scan'; }); GROUPS.scan.splice(0, 0, ['p-smart', 'סריקה']); PAGE_GROUP['p-smart'] = 'scan';
+  GROUPS.scan = GROUPS.scan.filter(function (x) { return x[0] !== 'p-smart'; }); GROUPS.scan.splice(0, 0, ['p-smart', 'סריקה']); PAGE_GROUP['p-smart'] = 'scan';
   var _e = onEnter; onEnter = function (id) { _e(id); if (id === 'p-smart') paint(); if (id === 'p-morning') renderHome(); };
   /* כרטיס בדף הבית */
   var big = document.getElementById('bigCards');
