@@ -365,7 +365,7 @@ body.demo header{margin-top:22px}
 
 <!-- בוקר: דף הבית -->
 <section class="page on" id="p-morning">
-  <div class="tabs" id="homeJump"><button data-j="#mood">📊 היום</button><button data-j="#liveH">📺 טלוויזיה</button><button data-j="#colNews">📰 חדשות</button><button data-j="#anH">🔭 אנליסטים</button><button data-j="#idxH">📈 מדדים</button><button data-j="#ckH">✅ צ'ק ליסט</button></div>
+  <div class="tabs" id="homeJump"><button data-j="#mood">היום</button><button data-j="#liveH">טלוויזיה</button><button data-j="#colNews">חדשות</button><button data-j="#anH">אנליסטים</button><button data-j="#idxH">מדדים</button><button data-j="#ckH">משימות</button></div>
   <div class="today3">
     <aside class="tcol" id="colNews">
       <h2 style="margin-top:4px">חדשות <small id="todayNewsT"></small><button class="btn ghost small" id="tnRefresh">↻</button></h2>
@@ -380,7 +380,7 @@ body.demo header{margin-top:22px}
       <div class="big" id="bigCards" style="margin-top:10px"></div>
       
     
-      <h2 id="ckH">צ'ק ליסט יומי <small id="dailyCount"></small></h2>
+      <h2 id="ckH">משימות היום <small id="dailyCount"></small></h2>
   <div class="card"><div class="progress"><i id="dailyBar"></i></div><ul class="check" id="daily"></ul></div>
   
     
@@ -390,10 +390,10 @@ body.demo header{margin-top:22px}
       <div class="card" id="todayEvents"></div>
       
     
-      <div class="qa"><button id="qaScan"><span>🔎</span>סורק</button><button id="qaChat"><span>💬</span>שאל</button><button id="qaWeekly"><span>📊</span>שבועי</button><button id="eodBtn"><span>🌙</span>סוף יום</button></div>
+      <div class="qa"><button id="qaScan"><span>🔎</span>סריקה</button><button id="qaChat"><span>💬</span>שאל</button><button id="qaWeekly"><span>📊</span>שבועי</button><button id="eodBtn"><span>🌙</span>סוף יום</button></div>
     </div>
     <aside class="tcol" id="colLeft">
-      <h2 id="liveH" style="margin-top:4px">📺 שידור חי</h2>
+      <h2 id="liveH" style="margin-top:4px">שידור חי</h2>
       <div class="card">
     <div>
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><div class="subtabs" style="margin:0;flex:1"><button data-live="tv10" class="on">ערוץ 10 – כלכלה</button><button data-live="bbg">Bloomberg</button><button data-live="yf">Yahoo</button><button data-live="off">כבוי</button></div></div>
@@ -404,14 +404,14 @@ body.demo header{margin-top:22px}
   </div>
       
       <div id="lessonBox"></div>
-      <h2 id="anH">🔭 מידע מוקדם · אנליסטים <small id="anT"></small><button class="btn ghost small" id="anRefresh" title="חפש עכשיו ברשת">↻</button></h2>
-      <div class="tabs" id="anTabs" style="margin:0 0 6px"><button data-t="web" class="on">שינויי המלצות</button><button data-t="cons">קונצנזוס</button></div>
+      <h2 id="anH">אנליסטים <small id="anT"></small><button class="btn ghost small" id="anRefresh" title="חפש עכשיו ברשת">↻</button></h2>
+      <div class="tabs" id="anTabs" style="margin:0 0 6px"><button data-t="web" class="on">עדכונים</button><button data-t="cons">קונצנזוס</button></div>
       <div class="card scrollcol" id="anBox"><div class="empty">טוען…</div></div>
-      <h2 id="idxH">מדדים עכשיו</h2>
+      <h2 id="idxH">מדדים</h2>
       <div class="card" id="idxBox" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px"></div>
       
     
-      <h2>קפיצות של 10%+ <small id="moversT">אוטומטי</small></h2>
+      <h2>קפיצות חדות <small id="moversT"></small></h2>
       <div class="card" id="moversBox" style="max-height:26vh;overflow-y:auto"><div class="empty">סורק את כל הרשימות כל 5 דק' בשעות המסחר. מניה שזזה ±10% נכנסת, ירדה מתחת – יוצאת.</div></div>
       <h2>הסורק היום <small id="scanMiniT"></small><button class="btn ghost small" id="scanMiniRun">סרוק</button></h2>
       <div class="card" id="scanMini"></div>
@@ -430,7 +430,7 @@ body.demo header{margin-top:22px}
   <div class="today">
     <div id="chartsBlock" style="margin-top:10px">
   <div id="studies" style="display:none"></div>
-  <div class="chartbar"><b id="chartSym" style="font-size:18px;font-weight:900;direction:ltr;text-align:right">MSTR</b><input id="symSearch" placeholder="🔍 חפש טיקר… (AAPL, TSLA)" style="width:190px;background:var(--panel);border:1px solid var(--line);border-radius:999px;color:var(--ink);font:inherit;font-size:13px;padding:7px 12px;direction:ltr;text-transform:uppercase"><button class="btn ghost small" id="whoBtn" title="מי החברה?">ℹ️ מי זו?</button><span style="flex:1"></span><span style="display:none"><button data-view="tv" class="on"></button><button data-view="pos"></button></span><button class="btn ghost small" id="wlRefresh" title="רענן מחירים">⟳</button><button class="btn ghost small" id="openTV" title="פותח ב-TradingView עם החשבון והקווים שלך">TV ↗</button><button class="btn blue small" id="snap">📷 העתק גרף לניתוח</button></div>
+  <div class="chartbar"><b id="chartSym" style="font-size:18px;font-weight:900;direction:ltr;text-align:right">MSTR</b><input id="symSearch" placeholder="🔍 חפש טיקר… (AAPL, TSLA)" style="width:190px;background:var(--panel);border:1px solid var(--line);border-radius:999px;color:var(--ink);font:inherit;font-size:13px;padding:7px 12px;direction:ltr;text-transform:uppercase"><button class="btn ghost small" id="whoBtn" title="מי החברה?">על החברה</button><span style="flex:1"></span><span style="display:none"><button data-view="tv" class="on"></button><button data-view="pos"></button></span><button class="btn ghost small" id="wlRefresh" title="רענן מחירים">⟳</button><button class="btn ghost small" id="openTV" title="פותח ב-TradingView עם החשבון והקווים שלך">TradingView</button><button class="btn blue small" id="snap">צלם לניתוח</button></div>
   <div class="cwrap">
     <div class="wlwrap"><div class="wl" id="wl"></div></div>
     <div><div class="chartbox"><div id="chart"></div></div><div id="posStrip"></div><div id="ticketBox"></div></div>
@@ -568,7 +568,7 @@ body.demo header{margin-top:22px}
   <div class="card" id="rulesBox"></div>
   <h2>אירועים ידניים <small>פד, CPI, אירוע אישי</small></h2>
   <div class="card"><div class="jform"><input id="evName" placeholder="שם האירוע"><input id="evDate" type="date"><button class="btn full" id="evAdd">הוסף</button></div><div id="evList" style="margin-top:8px"></div></div>
-  <h2>הגדרות <small>נשמר במכשיר בלבד, לא בענן</small></h2>
+  <h2>הגדרות <small>המפתחות מסונכרנים בין מכשירים עם קוד</small></h2>
   <div class="card set">
     <h2 style="margin:0 0 6px">🧠 מנוע</h2>
     <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="sEco" style="width:auto"> מצב חסכוני – מודל זול לחדשות/רדיו/צ'אט, פחות נתונים בניתוח, רענון חדשות כל שעה</label>
@@ -611,9 +611,9 @@ body.demo header{margin-top:22px}
 </main>
 
 <nav>
-  <button data-g="morning" class="on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>בוקר</button>
+  <button data-g="morning" class="on"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>בית</button>
   <button data-g="trade"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l3-4 3 2 5-7"/></svg>מסחר</button>
-  <button data-g="scan"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>סורק</button>
+  <button data-g="scan"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>סריקה</button>
   <button data-g="port"><svg viewBox="0 0 24 24"><path d="M4 8h16v11H4zM9 8V5h6v3"/></svg>תיק</button>
   <button data-g="journal"><svg viewBox="0 0 24 24"><path d="M4 4h12l4 4v12H4zM8 4v5h8V4M8 14h8M8 18h5"/></svg>יומן</button>
   <button data-g="news"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>חדשות</button>
@@ -1066,11 +1066,11 @@ document.addEventListener('paste',async e=>{const f=[...(e.clipboardData?.files|
 });
 /* ===== ניווט: שישה מסכים, עם לשוניות משנה ===== */
 const GROUPS={
-  morning:[['p-morning','בוקר']],
-  trade:[['p-today','גרף ועסקה'],['p-ai','ניתוח AI'],['p-plan','תוכניות']],
+  morning:[['p-morning','בית']],
+  trade:[['p-today','גרף'],['p-ai','מתמונה'],['p-plan','תוכניות']],
   scan:[['p-scan','סורק']],
   port:[['p-port','פוזיציות']],
-  journal:[['p-journal','יומן ועסקאות'],['p-weekly','סיכום שבועי']],
+  journal:[['p-journal','יומן'],['p-weekly','סיכום שבועי']],
   news:[['p-news','חדשות']]
 };
 const PAGE_GROUP={};Object.entries(GROUPS).forEach(([g,ps])=>ps.forEach(([id])=>PAGE_GROUP[id]=g));
@@ -1758,7 +1758,7 @@ async function dailyBrief(){if(briefBusy)return;briefBusy=true;try{
   const txt=await claude([{role:'user',content:`חדשות:\n${N}\nפוזיציות: ${T||'אין'}. BTC: ${LIVE['BTC']?.price||'?'}.\nכתוב משפט אחד (עד 25 מילים) לסוחר: מה הדבר האחד שחשוב היום. בלי הקדמה.`}],{max_tokens:80,tier:'cheap'});
   D.brief={d:todayStr(),txt};await save();renderMood(LIVE['BTC'],D.trades.filter(t=>t.status!=='closed'),evCache.filter(e=>e.dd<=7),todayStats());
 }catch(e){}briefBusy=false}
-$('#qaWeekly').onclick=()=>{goPage('p-weekly');renderWeekly()};$('#qaScan').onclick=()=>{goPage('p-scan');if(!D.scan||D.scan.d!==todayStr())runScan()};$('#qaChat').onclick=()=>$('#chatFab').click();
+$('#qaWeekly').onclick=()=>{goPage('p-weekly');renderWeekly()};$('#qaScan').onclick=()=>{goPage('p-smart');onEnter('p-smart')};$('#qaChat').onclick=()=>$('#chatFab').click();
 $('#eodBtn').onclick=async()=>{goPage('p-morning');await endOfDay(true);const e=D.eod[todayStr()];if(e){e.hidden=false;renderEod()}};
 $$('#p-more [data-go]').forEach(b=>b.onclick=()=>{goPage(b.dataset.go);if(b.dataset.go==='p-news'){renderNews();autoNews()}if(b.dataset.go==='p-scan')renderScan();if(b.dataset.go==='p-weekly')renderWeekly()});
 

@@ -40,7 +40,7 @@
     (D.watch || []).forEach(function (w) { w.items.forEach(function (t) { if (!/[:\/]/.test(t)) add(t); }); }); return out;
   }
   function fh(path) { var c = DP.getClient(); return c._json(c.fhBase + path + (path.indexOf('?') >= 0 ? '&' : '?') + 'token=' + encodeURIComponent(S.fh), c.fhLimiter); }
-  function setMsg(t) { ST.msg = t; var n = $q('#scMsg'); if (n) n.textContent = t; var b = $q('#scBar i'); if (b && ST.total) b.style.width = Math.min(100, Math.round(ST.done / ST.total * 100)) + '%'; var s = $q('#scStage'); if (s) s.textContent = ST.stage ? 'שלב ' + ST.stage + ' מתוך 3' : ''; }
+  function setMsg(t) { ST.msg = t; var n = $q('#scMsg'); if (n) n.textContent = t; var b = $q('#scBar i'); if (b && ST.total) b.style.width = Math.min(100, Math.round(ST.done / ST.total * 100)) + '%'; var s = $q('#scStage'); if (s) s.textContent = ''; }
   async function pool(items, n, fn) { var i = 0, res = new Array(items.length); await Promise.all(Array.from({ length: n }, async function () { while (i < items.length && !ST.stop) { var k = i++; res[k] = await fn(items[k], k); } })); return res; }
 
   /* ---------- שלב 1: סריקה מהירה (Finnhub) ---------- */
@@ -58,23 +58,32 @@
     if (r13 != null) { L += r13 > 15 ? 1 : 0; S_ += r13 < -15 ? 1 : 0; }
     if (gap != null) { L += gap > 2 ? 1 : 0; S_ += gap < -2 ? 1 : 0; }
     if (fs && fs.score != null) { L += fs.score >= 65 ? 1 : 0; S_ += fs.score <= 35 ? 1 : 0; }
-    return { sym: sym, price: price, chg: q ? q.dp : null, gap: gap, dHi: dHi, dLo: dLo, rs13: rs13, rs26: rs26, r13: r13, fs: fs ? fs.score : null, fsNotes: fs ? fs.notes : [], L: L, S: S_, metric: m };
+    /* מדד עניין: מה קורה עכשיו (תנועה היום, גאפ, קרבה לשיא או שפל שנתי, חוזק מול השוק) */
+    var hot = [], move = q ? Math.min(30, Math.abs(q.dp || 0) * 6) : 0, gp = gap != null ? Math.min(15, Math.abs(gap) * 3) : 0, lvl = 0;
+    if (q && Math.abs(q.dp || 0) >= 2) hot.push((q.dp > 0 ? 'עולה ' : 'יורדת ') + num(Math.abs(q.dp), 1) + '% היום');
+    if (gap != null && Math.abs(gap) >= 2) hot.push('גאפ ' + (gap > 0 ? '+' : '') + num(gap, 1) + '%');
+    if (dHi != null) { lvl = dHi >= -2 ? 15 : dHi >= -5 ? 10 : dHi >= -10 ? 5 : 0; if (dHi >= -5) hot.push('ליד שיא שנתי'); }
+    if (dLo != null) { var l2 = dLo <= 3 ? 15 : dLo <= 8 ? 10 : dLo <= 15 ? 5 : 0; if (l2 > lvl) lvl = l2; if (dLo <= 8) hot.push('ליד שפל שנתי'); }
+    var rsI = rs13 != null ? Math.min(15, Math.abs(rs13)) : 0; if (rs13 != null && Math.abs(rs13) >= 8) hot.push(rs13 > 0 ? 'חזקה מהשוק' : 'חלשה מהשוק');
+    var fsI = fs && fs.score != null && (fs.score >= 75 || fs.score <= 25) ? 5 : 0, r13I = r13 != null ? Math.min(10, Math.abs(r13) / 3) : 0;
+    var interest = Math.round(move + gp + lvl + rsI + fsI + r13I);
+    return { sym: sym, interest: interest, hot: hot, price: price, chg: q ? q.dp : null, gap: gap, dHi: dHi, dLo: dLo, rs13: rs13, rs26: rs26, r13: r13, fs: fs ? fs.score : null, fsNotes: fs ? fs.notes : [], L: L, S: S_, metric: m };
   }
   async function stage1(groups) {
     ST.stage = 1; ST.done = 0; var all = []; groups.forEach(function (g) { g.syms.forEach(function (sym) { all.push({ sym: sym, g: g }); }); }); ST.total = all.length; var bad = [];
     await pool(all, 5, async function (it) {
-      try { var m = await fh('/stock/metric?symbol=' + encodeURIComponent(it.sym) + '&metric=all'), r = s1row(it.sym, null, m); if (r.err) bad.push({ sym: it.sym, err: r.err }); else { r.sector = it.g.n; it.g.rows = (it.g.rows || []); it.g.rows.push(r); } }
+      try { var q = await fh('/quote?symbol=' + encodeURIComponent(it.sym)), m = await fh('/stock/metric?symbol=' + encodeURIComponent(it.sym) + '&metric=all'), r = s1row(it.sym, q, m); if (r.err) bad.push({ sym: it.sym, err: r.err }); else { r.sector = it.g.n; it.g.rows = (it.g.rows || []); it.g.rows.push(r); } }
       catch (e) { bad.push({ sym: it.sym, err: e.message }); if (/401|403/.test(e.message)) ST.stop = true; }
-      ST.done++; setMsg('סורק סקטורים: ' + ST.done + ' מתוך ' + all.length + ' מניות');
+      ST.done++; setMsg('בודק מה זז עכשיו: ' + ST.done + ' מתוך ' + all.length);
     });
     return bad;
   }
-  /* מכל סקטור בוחרים את n החזקות ביותר (לונג או שורט, לפי הציון המהיר הגבוה) */
+  /* מכל סקטור בוחרים את n המעניינות ביותר ברגע הסריקה, לפי מדד העניין (כל סריקה יכולה להחזיר רשימה אחרת) */
   function pickPerSector(groups, n) {
     var out = [];
     groups.forEach(function (g) {
       var rows = (g.rows && g.rows.length ? g.rows : g.syms.map(function (s) { return { sym: s, sector: g.n, L: 0, S: 0 }; })).slice();
-      rows.sort(function (a, b) { return Math.max(b.L, b.S) - Math.max(a.L, a.S) || Math.abs(b.rs13 || 0) - Math.abs(a.rs13 || 0); });
+      rows.sort(function (a, b) { return (b.interest || 0) - (a.interest || 0) || Math.max(b.L, b.S) - Math.max(a.L, a.S); });
       rows.slice(0, n).forEach(function (r) { r.sector = g.n; r.gk = g.k; r.side1 = r.L >= r.S ? 'long' : 'short'; out.push(r); });
     });
     return out;
@@ -219,22 +228,22 @@
   }
 
   /* ---------- תצוגה ---------- */
-  var DEC = { 2: ['entry', 'כניסה'], 1: ['prep', 'לקראת כניסה'], 0: ['watch', 'מעקב'] };
+  var DEC = { 2: ['entry', 'כניסה'], 1: ['prep', 'כמעט'], 0: ['watch', 'מעקב'] };
   function decText(r) {
     var side = r.dir === 'long' ? 'לונג' : 'שורט';
-    return r.step === 2 ? side + ': הציון המשולב גבוה וכל הרכיבים העיקריים תומכים. אפשר לתכנן כניסה לפי התוכנית.' : r.step === 1 ? side + ': יש כיוון ותמיכה חלקית. מחכים לריטסט, נר אישור או שיפור באחד הרכיבים החלשים.' : 'נטייה ל' + side + ' בלבד, בלי יתרון מספיק. אם נכנסים בכל זאת, רק בגודל מוקטן.';
+    return r.step === 2 ? side + ': כל הסימנים מצביעים לאותו כיוון. אפשר לתכנן כניסה.' : r.step === 1 ? side + ': יש כיוון אבל חסר אישור. מחכים לריטסט או לנר אישור.' : side + ' חלש. בלי יתרון ברור, ואם נכנסים אז בגודל קטן.';
   }
   function bar(v) { var p = Math.round(Math.min(100, Math.abs(v)) / 2); return '<div class="dp-bar"><i class="' + (v >= 0 ? 'pos' : 'neg') + '" style="' + (v >= 0 ? 'right:50%;' : 'left:50%;') + 'width:' + p + '%"></i></div>'; }
   function cardHtml(r) {
     var d = DEC[r.step], side = r.dir, p = r.plan, pos = r.br.filter(function (b) { return b.v >= 3; }).length;
     var chips = r.br.map(function (b) { return '<span class="sc-ch ' + (b.v >= 3 ? 'pos' : b.v <= -3 ? 'neg' : '') + '" title="' + esc(b.label) + '">' + b.k + ' ' + (b.v >= 0 ? '+' : '') + Math.round(b.v) + '</span>'; }).join('');
     return '<div class="sm-r ' + side + ' s' + r.step + '" data-s="' + esc(r.sym) + '"><div class="sm-h"><b class="tk">' + esc(r.sym) + '</b><span class="sm-px">$' + px(r.price) + (r.chg != null ? ' <em class="' + (r.chg >= 0 ? 'up' : 'down') + '">' + (r.chg >= 0 ? '+' : '') + num(r.chg, 1) + '%</em>' : '') + '</span><span class="sm-v ' + side + '">' + (side === 'long' ? 'לונג' : 'שורט') + ' · ' + r.comp + '/100</span></div>' +
-      '<div class="sc-comp"><div class="sc-meter"><i style="width:' + r.comp + '%"></i></div></div>' +
+      '<div class="sc-comp"><div class="sc-meter"><i style="width:' + r.comp + '%"></i></div></div>' + (r.hot && r.hot.length ? '<div class="sc-hot">' + r.hot.slice(0, 3).map(function (h) { return '<span>' + esc(h) + '</span>'; }).join('') + '</div>' : '') +
       '<div class="sm-d ' + d[0] + '"><i></i><b>' + d[1] + '</b><span>' + esc(decText(r)) + '</span></div><div class="sc-chips">' + chips + '</div>' +
       (r.why.length ? '<ul class="dp-list pos sc-l">' + r.why.slice(0, 4).map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>' : '') +
       (r.risks.length ? '<ul class="dp-list neg sc-l">' + r.risks.slice(0, 3).map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>' : '') +
       '<div class="sm-pl"><span>כניסה <b>$' + px(p.entry) + '</b></span><span>סטופ <b class="down">$' + px(p.stop) + '</b></span><span>יעד 1 <b class="up">$' + px(p.t1) + '</b></span><span>יעד 2 <b class="up">$' + px(p.t2) + '</b></span><span>כמות <b>' + (p.qty || '–') + '</b></span></div>' +
-      '<div class="sm-a"><button data-a="deep">🧠 ניתוח מלא</button><button data-a="calc">🧮 מחשבון</button><button data-a="save">📓 שמור ליומן</button></div></div>';
+      '<div class="sm-a"><button data-a="deep">ניתוח</button><button data-a="calc">גודל</button><button data-a="save">שמור</button></div></div>';
   }
   function specCard(x) {
     var days = x.date ? Math.round((Date.parse(x.date) - Date.now()) / 864e5) : null, cap = x.cap != null ? (x.cap >= 1000 ? '$' + num(x.cap / 1000, 1) + 'B' : '$' + num(x.cap, 0) + 'M') : '–';
@@ -243,31 +252,31 @@
       '<div class="sm-kv">' + esc(x.name) + ' · שווי שוק ' + cap + (x.ind ? ' · ' + esc(x.ind) : '') + (x.over5 ? ' · <em class="warn">מעל $5</em>' : '') + '</div>' +
       '<p class="sp-c">' + esc(x.catalyst) + '</p>' + (x.why ? '<ul class="dp-list pos sc-l"><li>' + esc(x.why) + '</li></ul>' : '') + (x.risk ? '<ul class="dp-list neg sc-l"><li>' + esc(x.risk) + '</li></ul>' : '') +
       '<div class="sm-pl"><span>כניסה <b>$' + px(x.price) + '</b></span><span>סטופ (−15%) <b class="down">$' + px(stop) + '</b></span><span>גודל שמרני <b>' + (qty || '–') + '</b></span><span>סיכון <b>$' + num(qty * x.price * 0.15, 0) + '</b></span></div>' +
-      '<div class="sm-a"><a class="sp-src" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.source) + ' ↗</a><button data-a="deep">🧠 ניתוח מלא</button><button data-a="save">📓 שמור ליומן</button></div></div>';
+      '<div class="sm-a"><a class="sp-src" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.source) + ' ↗</a><button data-a="deep">ניתוח</button><button data-a="save">שמור</button></div></div>';
   }
   function paint() {
     var host = $q('#scOut'); if (!host) return;
-    var go = $q('#scGo'); if (go) go.textContent = ST.busy ? '⏹ עצור' : '🔎 סרוק את השוק';
+    var go = $q('#scGo'); if (go) go.textContent = ST.busy ? 'עצור' : 'סרוק';
     var bar_ = $q('#scBar'); if (bar_) bar_.style.display = ST.busy ? '' : 'none';
     document.querySelectorAll('#scMode button').forEach(function (b) { b.classList.toggle('on', b.dataset.m === ST.mode); });
     var cu = $q('#scCustomW'); if (cu) cu.style.display = ST.mode === 'custom' ? '' : 'none';
     var sp = $q('#scSpecW'); if (sp) sp.style.display = ST.mode === 'sectors' || ST.mode === 'quick' ? '' : 'none';
     var R = ST.report;
-    if (!R) { host.innerHTML = ST.busy ? '<div class="dp-skel"><i style="height:150px"></i><i style="height:150px"></i></div>' : '<div class="dp-card"><div class="dp-empty">עוד לא נסרק. לחץ "סרוק את השוק". סריקה של 5 מכל סקטור לוקחת כ-7 דקות (מהיר: כ-4). אפשר לקרוא תוצאות כבר כשהסקטורים נטענים.</div></div>'; return; }
+    if (!R) { host.innerHTML = ST.busy ? '<div class="dp-skel"><i style="height:150px"></i><i style="height:150px"></i></div>' : '<div class="dp-card"><div class="dp-empty">לחץ "סרוק" וקבל את המניות הכי מעניינות ברגע זה, בכל סקטור. הסריקה לוקחת כמה דקות.</div></div>'; return; }
     var rows = R.rows, L = rows.filter(function (r) { return r.dir === 'long'; }).length, Sh = rows.length - L, top = rows.filter(function (r) { return r.step === 2; }).length;
     var rg = R.regime ? '<div class="dp-regime ' + R.regime.state + '"><i></i><b>' + R.regime.label + '</b><span>SPY ' + (R.regime.dist >= 0 ? '+' : '') + R.regime.dist.toFixed(1) + '% מממוצע 200</span></div>' : '';
-    var ph = AT.session.phase(Date.now()), when = '<div class="dp-foot" style="text-align:right">סריקה מ-' + new Date(R.at).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' · ' + R.universe + ' מניות בסקטורים, נותחו לעומק ' + rows.length + ' · כעת: ' + esc(ph.label) + '</div>';
+    var ph = AT.session.phase(Date.now()), when = '<div class="dp-foot" style="text-align:right">נסרק ב-' + new Date(R.at).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' · כעת: ' + esc(ph.label) + '</div>';
     var sum = '<div class="sm-sum"><div><b>' + top + '</b><span>כניסה</span></div><div><b class="up">' + L + '</b><span>לונג</span></div><div><b class="down">' + Sh + '</b><span>שורט</span></div><div><b>' + rows.length + '</b><span>נותחו</span></div></div>';
-    var jump = '<div class="tabs" id="scJump" style="margin:6px 0 4px">' + (R.sectors || []).map(function (g) { return '<button data-j="sec-' + g.k + '">' + esc(g.n) + '</button>'; }).join('') + (R.spec ? '<button data-j="sec-spec">🚀 ספקולטיביות</button>' : '') + '</div>';
-    var secs = (R.sectors || []).map(function (g) { return '<h2 id="sec-' + g.k + '">' + esc(g.n) + ' <small>' + g.rows.length + ' מניות</small></h2>' + g.rows.slice().sort(function (a, b) { return b.step - a.step || b.comp - a.comp; }).map(cardHtml).join(''); }).join('');
+    var jump = '<div class="tabs" id="scJump" style="margin:6px 0 4px">' + (R.sectors || []).map(function (g) { return '<button data-j="sec-' + g.k + '">' + esc(g.n) + '</button>'; }).join('') + (R.spec ? '<button data-j="sec-spec">עד $5</button>' : '') + '</div>';
+    var secs = (R.sectors || []).map(function (g) { return '<h2 id="sec-' + g.k + '">' + esc(g.n) + '</h2>' + g.rows.slice().sort(function (a, b) { return b.step - a.step || b.comp - a.comp; }).map(cardHtml).join(''); }).join('');
     var spc = '';
     if (R.spec) {
-      if (R.spec.err) spc = '<h2 id="sec-spec">🚀 ספקולטיביות עד $5</h2><div class="dp-card"><div class="dp-empty">' + esc(R.spec.err) + '</div></div>';
-      else spc = '<h2 id="sec-spec">🚀 ספקולטיביות עד $5 <small>' + R.spec.items.length + ' מניות</small></h2><div class="dp-flag warn">סיכון גבוה: אירוע בינארי (אישור או דחייה), פערי מחיר, דילול הון ועצירות מסחר. מקצים סכום שאתה מוכן להפסיד כולו. הגודל המוצע הוא 25% מהסיכון הרגיל שלך, וסטופ 15% הוא מסגרת סיכון ולא תחזית. נמצאו ' + R.spec.found + ' מועמדות, ו-' + R.spec.validated + ' עברו אימות של טיקר ומחיר מול Finnhub.</div>' + (R.spec.items.length ? R.spec.items.map(specCard).join('') : '<div class="dp-card"><div class="dp-empty">לא נמצאו כרגע מניות עם קטליזטור מתועד ועם מחיר עד $10.</div></div>');
-    } else if (ST.busy && ST.spec && (ST.mode === 'sectors' || ST.mode === 'quick')) spc = '<h2 id="sec-spec">🚀 ספקולטיביות עד $5</h2><div class="dp-card"><div class="dp-empty"><span class="spin"></span> מחפש ברשת מניות עם קטליזטור…</div></div>';
+      if (R.spec.err) spc = '<h2 id="sec-spec">מניות עד $5</h2><div class="dp-card"><div class="dp-empty">' + esc(R.spec.err) + '</div></div>';
+      else spc = '<h2 id="sec-spec">מניות עד $5 <small>סיכון גבוה</small></h2><div class="dp-flag warn">מניות כאלה יכולות לאבד את רוב הערך בחדשה שלילית. הקצה רק סכום שאתה מוכן להפסיד. הגודל המוצע הוא רבע מהסיכון הרגיל שלך, והסטופ (15%) הוא מסגרת סיכון ולא תחזית.</div>' + (R.spec.items.length ? R.spec.items.map(specCard).join('') : '<div class="dp-card"><div class="dp-empty">לא נמצאו כרגע מניות עם קטליזטור מתועד ועם מחיר עד $10.</div></div>');
+    } else if (ST.busy && ST.spec && (ST.mode === 'sectors' || ST.mode === 'quick')) spc = '<h2 id="sec-spec">מניות עד $5</h2><div class="dp-card"><div class="dp-empty"><span class="spin"></span> מחפש…</div></div>';
     var bad = (R.failed || []).length ? '<details class="ht-set"><summary>לא נסרקו (' + R.failed.length + ')</summary>' + R.failed.slice(0, 30).map(function (x) { return '<div class="dp-foot" style="text-align:right">' + esc(x.sym) + ': ' + esc(x.err) + '</div>'; }).join('') + '</details>' : '';
     host.innerHTML = rg + when + sum + (R.rows.length ? jump + secs : '<div class="dp-card"><div class="dp-empty">לא נמצאו מניות לניתוח מלא.</div></div>') + spc + bad +
-      '<div class="dp-foot" style="text-align:right;margin-top:10px">הציון המשולב הוא סכום שקוף של טכני (עד 40), תבנית מגמה (15), יסוד (10), אנליסטים (10), נרות (8), חוזק יחסי (5), מצב שוק, גאפ ודוחות. לא ייעוץ השקעות, והציון אינו הבטחה. נתוני Finnhub חינמיים עשויים להיות מושהים.</div>';
+      '<details class="ht-set"><summary>איך מחושב הציון</summary><div class="dp-foot" style="text-align:right">הציון הוא סכום של: טכני (עד 40), מגמה (15), יסוד (10), אנליסטים (10), נרות (8), חוזק מול השוק (5), מצב השוק, גאפ ודוחות. המניות נבחרות לפי מה שזז עכשיו. זה לא ייעוץ השקעות, והציון אינו הבטחה. נתונים חינמיים עשויים להיות מושהים.</div></details>';
     host.querySelectorAll('#scJump button').forEach(function (b) { b.onclick = function () { var t = document.getElementById(b.dataset.j); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }; });
     host.querySelectorAll('.sm-r:not(.sp)').forEach(function (el) {
       var r = R.rows.find(function (x) { return x.sym === el.dataset.s; });
@@ -310,12 +319,12 @@
   function renderHome() {
     var host = $q('#homeScan'); if (!host) return;
     var R = ST.report, today = R && new Date(R.at).toDateString() === new Date().toDateString(), ph = AT.session.phase(Date.now());
-    var pre = ph.key === 'pre' ? '<div class="dp-flag" style="margin-bottom:8px">טרום מסחר פעיל (' + ph.left + ' דקות עד הפתיחה). זה הזמן לסרוק, לבדוק גאפים והמלצות אנליסטים ולתכנן את היום.</div>' : '';
-    if (!R || !R.rows.length) { host.innerHTML = pre + '<div class="empty">עוד לא נסרק. <button class="btn small" id="hsGo">🔎 סרוק את השוק</button></div>'; }
+    var pre = ph.key === 'pre' ? '<div class="dp-flag" style="margin-bottom:8px">טרום מסחר פעיל, עוד ' + ph.left + ' דקות לפתיחה. זה הזמן לסרוק ולתכנן את היום.</div>' : '';
+    if (!R || !R.rows.length) { host.innerHTML = pre + '<div class="empty">עוד לא נסרק. <button class="btn small" id="hsGo">סרוק</button></div>'; }
     else {
       var pick = function (dir) { return R.rows.filter(function (r) { return r.dir === dir; }).slice(0, 3).map(function (r) { return '<div class="hs-r ' + dir + '" data-s="' + esc(r.sym) + '"><b>' + esc(r.sym) + '</b><span>' + DEC[r.step][1] + '</span><em>' + r.comp + '</em></div>'; }).join('') || '<div class="hs-n">אין</div>'; };
-      var spl = R.spec && R.spec.items && R.spec.items.length ? '<div class="hs-sp"><b>🚀 ספקולטיביות:</b> ' + R.spec.items.slice(0, 5).map(function (x) { return esc(x.sym) + ' $' + px(x.price); }).join(' · ') + '</div>' : '';
-      host.innerHTML = pre + '<div class="hs-g"><div><h4 class="up">לונג</h4>' + pick('long') + '</div><div><h4 class="down">שורט</h4>' + pick('short') + '</div></div>' + spl + '<div class="dp-foot" style="text-align:right">' + (today ? 'סריקה של היום, ' : 'סריקה ישנה מ-') + new Date(R.at).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' <button class="btn ghost small" id="hsOpen">פתח דוח מלא</button> <button class="btn small" id="hsGo">🔎 סרוק שוב</button></div>';
+      var spl = R.spec && R.spec.items && R.spec.items.length ? '<div class="hs-sp"><b>עד $5:</b> ' + R.spec.items.slice(0, 5).map(function (x) { return esc(x.sym) + ' $' + px(x.price); }).join(' · ') + '</div>' : '';
+      host.innerHTML = pre + '<div class="hs-g"><div><h4 class="up">לונג</h4>' + pick('long') + '</div><div><h4 class="down">שורט</h4>' + pick('short') + '</div></div>' + spl + '<div class="dp-foot" style="text-align:right">' + (today ? 'נסרק היום ב-' : 'סריקה ישנה מ-') + new Date(R.at).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' <button class="btn ghost small" id="hsOpen">פתח דוח</button> <button class="btn small" id="hsGo">סרוק שוב</button></div>';
       host.querySelectorAll('.hs-r').forEach(function (el) { el.onclick = function () { goPage('p-smart'); onEnter('p-smart'); var c = $q('.sm-r[data-s="' + el.dataset.s + '"]'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); }; });
     }
     var o = $q('#hsOpen'); if (o) o.onclick = function () { goPage('p-smart'); onEnter('p-smart'); };
@@ -325,13 +334,13 @@
   function build() {
     if ($q('#p-smart')) return;
     var sec = document.createElement('section'); sec.className = 'page'; sec.id = 'p-smart';
-    sec.innerHTML = '<div class="dp-card"><h3>סריקת מניות <small>שוק · אנליסטים · יסוד · טכני · נרות</small></h3>' +
-      '<button class="btn sc-big" id="scGo">🔎 סרוק את השוק</button>' +
-      '<div class="dp-seg" id="scMode" style="margin-top:10px"><button data-m="sectors">5 מכל סקטור</button><button data-m="quick">מהיר (3)</button><button data-m="mine">הרשימות שלי</button><button data-m="custom">הדבק</button></div>' +
-      '<label id="scSpecW" class="sc-spec"><input type="checkbox" id="scSpec" checked> כולל 5 מניות ספקולטיביות עד $5 עם קטליזטור (מחפש ברשת)</label>' +
-      '<div id="scCustomW" style="display:none"><textarea id="scTxt" class="sm-txt" rows="3" dir="ltr" placeholder="NVDA MU AMD   או   NASDAQ:NVDA NYSE:BA"></textarea></div>' +
+    sec.innerHTML = '<div class="dp-card sc-main"><button class="btn sc-big" id="scGo">סרוק</button>' +
       '<div class="dp-prog" id="scBar" style="display:none"><i></i></div><div class="sc-st"><span id="scStage"></span><span id="scMsg" class="dp-msg"></span></div>' +
-      '<details class="ht-set"><summary>🔧 בדיקת חיבורים (אם הנתונים לא נמשכים)</summary><div style="margin-top:10px"><button class="btn ghost" id="scDiagGo">בדוק את המפתחות עכשיו</button><div id="scDiag" style="margin-top:10px"></div></div></details></div><div id="scOut"></div>';
+      '<details class="ht-set"><summary>אפשרויות</summary><div class="sc-opt">' +
+      '<div class="dp-seg" id="scMode"><button data-m="sectors">מלא</button><button data-m="quick">מהיר</button><button data-m="mine">הרשימות שלי</button><button data-m="custom">הדבק מניות</button></div>' +
+      '<div id="scCustomW" style="display:none"><textarea id="scTxt" class="sm-txt" rows="3" dir="ltr" placeholder="NVDA MU AMD   או   NASDAQ:NVDA NYSE:BA"></textarea></div>' +
+      '<label id="scSpecW" class="sc-spec"><input type="checkbox" id="scSpec" checked> כולל מניות עד $5</label>' +
+      '<div class="sc-diag"><button class="btn ghost small" id="scDiagGo">בדיקת חיבורים</button><div id="scDiag"></div></div></div></details></div><div id="scOut"></div>';
     document.querySelector('main').appendChild(sec);
     document.querySelectorAll('#scMode button').forEach(function (b) { b.onclick = function () { ST.mode = b.dataset.m; paint(); }; });
     $q('#scGo').onclick = function () { if (ST.busy) { ST.stop = true; return; } if (ST.mode === 'custom') { var c = parseSyms($q('#scTxt').value); if (!c.length) return toast('הדבק לפחות סימול אחד'); run({ custom: c }); } else run({ mode: ST.mode }); };
@@ -339,11 +348,11 @@
     $q('#scDiagGo').onclick = diagnose;
   }
   build();
-  GROUPS.scan = GROUPS.scan.filter(function (x) { return x[0] !== 'p-smart'; }); GROUPS.scan.splice(0, 0, ['p-smart', 'סריקת מניות']); PAGE_GROUP['p-smart'] = 'scan';
+  GROUPS.scan = GROUPS.scan.filter(function (x) { return x[0] !== 'p-smart' && x[0] !== 'p-scan'; }); GROUPS.scan.splice(0, 0, ['p-smart', 'סריקה']); PAGE_GROUP['p-smart'] = 'scan';
   var _e = onEnter; onEnter = function (id) { _e(id); if (id === 'p-smart') paint(); if (id === 'p-morning') renderHome(); };
   /* כרטיס בדף הבית */
   var big = document.getElementById('bigCards');
-  if (big && !document.getElementById('homeScan')) big.insertAdjacentHTML('afterend', '<h2 id="hsH">🔎 סריקת היום <small>הזדמנויות לכניסה</small></h2><div class="card" id="homeScan"></div>');
+  if (big && !document.getElementById('homeScan')) big.insertAdjacentHTML('afterend', '<h2 id="hsH">הזדמנויות היום</h2><div class="card" id="homeScan"></div>');
   var wait = setInterval(function () { if (typeof D !== 'undefined' && D) { clearInterval(wait); renderHome(); } }, 400);
   window.runScan = function (custom) { goPage('p-smart'); onEnter('p-smart'); var c = custom || []; if (c.length) { $q('#scTxt').value = c.join(' '); ST.mode = 'custom'; paint(); run({ custom: c }); } };
   window.__scan = { parseSyms: parseSyms, s1row: s1row, pickPerSector: pickPerSector, composite: composite, technical: technical, ttShort: ttShort, run: run, state: ST, diagnose: diagnose, SECTORS: SECTORS, spec: spec, mkPlan: mkPlan };

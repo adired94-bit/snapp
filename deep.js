@@ -27,6 +27,10 @@
     pattern: ['תבנית נרות שורית', 'תבנית נרות דובית']
   };
   var STANCE = { long: ['LONG', 'לונג'], short: ['SHORT', 'שורט'], lean_long: ['LEAN LONG', 'נטייה ללונג'], lean_short: ['LEAN SHORT', 'נטייה לשורט'], flat: ['WAIT', 'להמתין'], nodata: ['NO DATA', 'אין נתונים'] };
+  var GATE_TXT = { 'חלון זמן מתאים': 'שעת מסחר מתאימה', 'ציון מאוחד עבר סף כניסה ללא ווטו': 'הציון מספיק חזק', 'נפח יחסי לפחות 1.2': 'נפח מסחר גבוה מהרגיל', 'המחיר עד חצי ATR מאזור מסומן': 'המחיר קרוב לרמה חשובה',
+    'יחס סיכוי לסיכון לפחות 2 ליעד ראשון': 'סיכוי/סיכון של לפחות 1:2', 'אין דוח או אירוע מאקרו בשעה הקרובה': 'אין דוח או אירוע בשעה הקרובה', 'טווח היום עדיין עד 2 ATR': 'המניה לא רצה כבר יותר מדי היום',
+    'לא שני סטופים ברצף': 'לא נפגעת מסטופ פעמיים ברצף', 'אין ירידה של מעל 10% אתמול בלי בסיס חדש': 'לא ירדה בחדות אתמול' };
+  var gl = function (t) { return GATE_TXT[t] || t; };
   var DEEP = { sym: '', mode: 'swing', busy: false, res: null, msg: '', client: null, keyFp: '', sugg: [], q: '' };
   var $q = function (s, r) { return (r || document).querySelector(s); };
   var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
@@ -306,7 +310,7 @@
       '<path d="M15 100 A85 85 0 0 1 185 100" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="14" stroke-linecap="round"/>' +
       '<path d="M15 100 A85 85 0 0 1 185 100" fill="none" stroke="url(#gg)" stroke-width="14" stroke-linecap="round" class="arc"/>' +
       '<g class="needle"><line x1="100" y1="100" x2="100" y2="34" stroke="#E8ECF2" stroke-width="3" stroke-linecap="round"/><circle cx="100" cy="100" r="7" fill="#E8ECF2"/></g></svg>' +
-      '<div class="dp-score"><b data-count="' + s + '">' + s + '</b><span>ציון התכנסות</span></div></div>';
+      '<div class="dp-score"><b data-count="' + s + '">' + s + '</b><span>ציון</span></div></div>';
   }
   function tile(k, v, cls, sub) { return '<div class="dp-tile ' + (cls || '') + '"><span>' + k + '</span><b>' + v + '</b>' + (sub ? '<small>' + sub + '</small>' : '') + '</div>'; }
   function bar(v) { var p = Math.round(Math.abs(v) * 50); return '<div class="dp-bar"><i class="' + (v >= 0 ? 'pos' : 'neg') + '" style="' + (v >= 0 ? 'right:50%;' : 'left:50%;') + 'width:' + p + '%"></i></div>'; }
@@ -340,13 +344,13 @@
       '<div class="dp-tiles">' + tile('כניסה', '$' + px(p.entry), 'ent', 'אזור $' + px(Math.min(p.zoneLo, p.zoneHi)) + ' – $' + px(Math.max(p.zoneLo, p.zoneHi))) + tile('סטופ לוס', '$' + px(p.stop), 'neg', '−' + num(p.riskPct, 2) + '%') +
       tile('יעד 1 · 2R', '$' + px(p.t1), 'pos', 'R:R 1:' + num(p.rr1, 1)) + tile('יעד 2 · 3R', '$' + px(p.t2), 'pos', 'R:R 1:' + num(p.rr2, 1)) + sz + '</div>' + capNote + obst +
       '<div class="dp-rules"><div><b>משך החזקה</b><span>' + p.hold + '</span></div><div><b>ניהול העסקה</b><span>' + p.trail + '</span></div><div><b>ביטול התרחיש</b><span>' + (long ? 'סגירה מתחת ל-$' + px(p.stop) : 'סגירה מעל $' + px(p.stop)) + ', או שהציון מתהפך לכיוון ההפוך.</span></div></div>' +
-      '<div class="dp-actions"><button class="btn" id="dpSave">📓 שמור ליומן כעסקה מתוכננת</button><button class="btn ghost" id="dpCopy">⎘ העתק תוכנית</button><button class="btn ghost" id="dpCalcBtn">🧮 מחשבון</button><button class="btn ghost" id="dpChartBtn">📈 גרף</button></div></section>';
+      '<div class="dp-actions"><button class="btn" id="dpSave">שמור ליומן</button><button class="btn ghost" id="dpCopy">העתק</button><button class="btn ghost" id="dpCalcBtn">מחשבון</button><button class="btn ghost" id="dpChartBtn">גרף</button></div></section>';
   }
   function gatesHtml(m) {
     var g = m.gates;
     var head = g.status === 'ready' ? ['ok', 'כל השערים עברו'] : g.status === 'blocked' ? ['no', 'חסום: ' + g.failed + ' שערים נכשלו'] : ['wait', g.unknown + ' שערים לא נבדקו'];
-    return '<section class="dp-card"><h3>שערי כניסה <small class="dp-st ' + head[0] + '">' + head[1] + '</small></h3><ul class="dp-gates">' + g.items.map(function (x) {
-      return '<li class="' + (x.ok === true ? 'ok' : x.ok === false ? 'no' : 'un') + '"><i>' + (x.ok === true ? '✓' : x.ok === false ? '✕' : '?') + '</i><div>' + esc(x.label) + (x.detail ? '<small>' + esc(x.detail) + '</small>' : '') + '</div></li>';
+    return '<section class="dp-card"><h3>בדיקות לפני כניסה <small class="dp-st ' + head[0] + '">' + head[1] + '</small></h3><ul class="dp-gates">' + g.items.map(function (x) {
+      return '<li class="' + (x.ok === true ? 'ok' : x.ok === false ? 'no' : 'un') + '"><i>' + (x.ok === true ? '✓' : x.ok === false ? '✕' : '?') + '</i><div>' + esc(gl(x.label)) + (x.detail ? '<small>' + esc(x.detail) + '</small>' : '') + '</div></li>';
     }).join('') + '</ul></section>';
   }
   function mtfHtml(m) {
@@ -365,7 +369,7 @@
       return '<div class="dp-comp"><span>' + COMP_NAME[k] + ' <small>' + E.COMP_W[k] + '</small></span>' + bar(v) + '<em>' + why + '</em></div>';
     }).join('');
     var pats = (b.patterns || []).map(function (p) { return '<span class="dp-pat ' + p.dir + '">' + esc(p.name) + '</span>'; }).join('');
-    return '<section class="dp-card"><h3>פירוק הציון <small>טווח בסיס ' + E.TF_LABEL[E.BASE_TF[m.mode]] + '</small></h3>' + rows +
+    return '<section class="dp-card"><h3>ממה מורכב הציון <small>טווח בסיס ' + E.TF_LABEL[E.BASE_TF[m.mode]] + '</small></h3>' + rows +
       (pats ? '<div class="dp-pats"><b>תבניות נרות כרגע:</b> ' + pats + '</div>' : '') +
       '<div class="dp-kv">' + [['RSI', b.rsi != null ? Math.round(b.rsi) : '–'], ['נפח יחסי', b.rvol != null ? 'x' + num(b.rvol, 2) : '–'], ['VWAP', b.vwap != null ? '$' + px(b.vwap) : '–'], ['POC', b.poc != null ? '$' + px(b.poc) : '–'], ['שוק', b.state === 'trend_up' ? 'מגמת עלייה' : b.state === 'trend_down' ? 'מגמת ירידה' : 'טווח']].map(function (x) { return '<div><span>' + x[0] + '</span><b>' + x[1] + '</b></div>'; }).join('') + '</div></section>';
   }
@@ -387,7 +391,7 @@
     L = up.concat(dn); L.push({ p: price, t: 'מחיר עכשיו', n: '', c: 'now' });
     L.sort(function (a, c) { return c.p - a.p; });
     var rows = L.map(function (x) { var d = (x.p - price) / price * 100; return '<div class="dp-lvl ' + x.c + '"><b>$' + px(x.p) + '</b><span>' + x.t + '</span><em>' + x.n + '</em><small>' + (x.c === 'now' ? '' : (d >= 0 ? '+' : '') + num(d, 1) + '% · ' + num(Math.abs(x.p - price) / b.atr, 1) + ' ATR') + '</small></div>'; }).join('');
-    return '<section class="dp-card"><h3>סולם רמות <small>5 מעל ו-5 מתחת למחיר</small></h3><div class="dp-lvls">' + rows + '</div><div class="dp-actions" style="grid-template-columns:1fr;margin-top:10px"><button class="btn ghost" id="dpLvl">📍 שמור את האזורים למעקב והתראות</button></div></section>';
+    return '<section class="dp-card"><h3>רמות מחיר <small>מעל ומתחת למחיר</small></h3><div class="dp-lvls">' + rows + '</div><div class="dp-actions" style="grid-template-columns:1fr;margin-top:10px"><button class="btn ghost" id="dpLvl">עקוב אחרי הרמות</button></div></section>';
   }
   function btHtml(r) {
     var b = r.bt; if (!b || !b.total) return '';
@@ -395,7 +399,7 @@
       var x = b.buckets[k], wr = Math.round(x.winRate * 100);
       return '<div class="bt-r"><b>ציון ' + k + '</b><div class="dp-bar"><i class="' + (x.avgR >= 0 ? 'pos' : 'neg') + '" style="' + (x.avgR >= 0 ? 'right:50%;' : 'left:50%;') + 'width:' + Math.min(50, Math.abs(x.avgR) * 25) + '%"></i></div><span>' + x.n + ' עסקאות · ' + wr + '% הצלחה · ' + (x.avgR >= 0 ? '+' : '') + num(x.avgR, 2) + 'R' + (x.enough ? '' : ' <em>מדגם קטן</em>') + '</span></div>';
     }).join('');
-    return '<section class="dp-card"><h3>אמינות הציון בעבר <small>' + esc(r.sym) + ' · יומי</small></h3>' + (rows || '<div class="dp-empty">לא היו מספיק איתותים בהיסטוריה.</div>') +
+    return '<section class="dp-card"><h3>כמה הציון עבד בעבר <small>' + esc(r.sym) + ' · יומי</small></h3>' + (rows || '<div class="dp-empty">לא היו מספיק איתותים בהיסטוריה.</div>') +
       '<div class="dp-foot" style="text-align:right;margin-top:8px">בדיקה על ההיסטוריה של הטיקר הזה בלבד: כניסה לפי הציון, סטופ 1.5 ATR, יעד 2R, עד 20 ימים, בלי עמלות. מדגם מתחת ל-30 עסקאות לא מוכיח כלום. זו לא הבטחה.</div></section>';
   }
   function regimeHtml(r) {
@@ -416,7 +420,7 @@
     var o = r.orb, fm = function (n) { return n == null ? '–' : '$' + px(n); };
     var tiles = tile('גאפ', d.gapPct != null ? (d.gapPct >= 0 ? '+' : '') + num(d.gapPct, 2) + '%' : '–', d.gapPct != null && Math.abs(d.gapPct) >= 4 ? 'big' : '', Math.abs(d.gapPct || 0) >= 4 ? 'גאפ משמעותי' : '') + tile('נפח יחסי לפי שעה', d.rvol != null ? 'x' + num(d.rvol, 2) : '–', d.rvol >= 2 ? 'pos' : '', d.rvol != null ? 'מול ' + d.rvolN + ' ימים' : 'אין השוואה') +
       tile('גבוה אתמול (PDH)', fm(d.pdh)) + tile('נמוך אתמול (PDL)', fm(d.pdl)) + tile('טווח פתיחה גבוה', fm(d.orh), 'pos', '30 דקות ראשונות') + tile('טווח פתיחה נמוך', fm(d.orl), 'neg') + tile('VWAP של היום', fm(d.vwap), '', d.last > d.vwap ? 'המחיר מעליו' : 'המחיר מתחתיו');
-    var plan = o ? '<div class="dp-rules"><div><b>תוכנית פריצת פתיחה (ORB) · ' + (o.dir === 'long' ? 'לונג' : 'שורט') + '</b><span>כניסה ' + (o.dir === 'long' ? 'מעל ' : 'מתחת ל-') + fm(o.entry) + ' · סטופ ' + fm(o.stop) + ' · יעד 1 (1R) ' + fm(o.t1) + ' · יעד 2 (2R) ' + fm(o.t2) + (o.qty ? ' · כמות ' + o.qty : '') + '</span></div>' +
+    var plan = o ? '<div class="dp-rules"><div><b>תוכנית פריצה בפתיחה · ' + (o.dir === 'long' ? 'לונג' : 'שורט') + '</b><span>כניסה ' + (o.dir === 'long' ? 'מעל ' : 'מתחת ל-') + fm(o.entry) + ' · סטופ ' + fm(o.stop) + ' · יעד 1 (1R) ' + fm(o.t1) + ' · יעד 2 (2R) ' + fm(o.t2) + (o.qty ? ' · כמות ' + o.qty : '') + '</span></div>' +
       '<div><b>תנאים לפני כניסה</b><span>אחרי 10:00 שעון ניו יורק · נר סוגר מעבר לטווח, לא רק נוגע · המחיר ' + (o.dir === 'long' ? 'מעל' : 'מתחת ל') + '-VWAP · נפח יחסי לפחות 1.5 · יש סיבה לתנועה (חדשות או דוח). בלי סיבה, מוותרים.</span></div></div>' : '';
     return '<section class="dp-card"><h3>מפת היום <small>' + esc(d.date) + (d.complete ? ' · יום שלם' : ' · עד ' + Math.floor(d.lastMin / 60) + ':' + ('0' + d.lastMin % 60).slice(-2) + ' ניו יורק') + '</small></h3><div class="dp-tiles">' + tiles + '</div>' + plan + '</section>';
   }
@@ -428,8 +432,8 @@
   }
   function fundHtml(r) {
     var f = r.fund, s = r.fs;
-    if (r.sym.indexOf('/') >= 0) return '<section class="dp-card"><h3>פונדמנטל</h3><div class="dp-empty">נכס קריפטו: אין דוחות כספיים. הניתוח כאן טכני בלבד.</div></section>';
-    if (!f) return '<section class="dp-card"><h3>פונדמנטל</h3><div class="dp-empty">' + (S.fh ? 'לא התקבלו נתוני יסוד מ-Finnhub לנכס הזה.' : 'הוסף מפתח Finnhub בהגדרות כדי לקבל שווי שוק, מכפילים, צמיחה והמלצות אנליסטים.') + '</div></section>';
+    if (r.sym.indexOf('/') >= 0) return '<section class="dp-card"><h3>נתוני החברה</h3><div class="dp-empty">נכס קריפטו: אין דוחות כספיים. הניתוח כאן טכני בלבד.</div></section>';
+    if (!f) return '<section class="dp-card"><h3>נתוני החברה</h3><div class="dp-empty">' + (S.fh ? 'לא התקבלו נתוני יסוד מ-Finnhub לנכס הזה.' : 'הוסף מפתח Finnhub בהגדרות כדי לקבל שווי שוק, מכפילים, צמיחה והמלצות אנליסטים.') + '</div></section>';
     var m = f.metric, p = f.profile, c = cap(p.marketCapitalization), rec = f.rec;
     var g = function () { for (var i = 0; i < arguments.length; i++) { var v = m[arguments[i]]; if (v != null && isFinite(v)) return v; } return null; };
     var tiles = [['שווי שוק', c.txt, c.cls], ['מכפיל רווח', num(g('peTTM', 'peBasicExclExtraTTM', 'peNormalizedAnnual'), 1)], ['צמיחת הכנסות', num(g('revenueGrowthTTMYoy'), 1) + '%'], ['צמיחת רווח למניה', num(g('epsGrowthTTMYoy'), 1) + '%'],
@@ -439,7 +443,7 @@
     var recH = rec ? '<div class="dp-rec"><b>המלצות אנליסטים (' + esc(rec.period || '') + ')</b><div class="dp-recbar">' + [['strongBuy', 'קנייה חזקה', '#0FA36A'], ['buy', 'קנייה', '#19D68A'], ['hold', 'החזק', '#FFB020'], ['sell', 'מכירה', '#FF7A85'], ['strongSell', 'מכירה חזקה', '#FF4D5E']].map(function (x) { return '<i style="flex:' + (rec[x[0]] || 0) + ';background:' + x[2] + '" title="' + x[1] + ': ' + (rec[x[0]] || 0) + '"></i>'; }).join('') + '</div><small>' + (rec.strongBuy || 0) + ' קנייה חזקה · ' + (rec.buy || 0) + ' קנייה · ' + (rec.hold || 0) + ' החזק · ' + (rec.sell || 0) + ' מכירה · ' + (rec.strongSell || 0) + ' מכירה חזקה</small></div>' : '';
     var notes = s && s.notes.length ? '<ul class="dp-gates">' + s.notes.map(function (n) { return '<li class="' + (n.ok ? 'ok' : 'no') + '"><i>' + (n.ok ? '✓' : '✕') + '</i><div>' + esc(n.t) + '</div></li>'; }).join('') + '</ul>' : '';
     var ed = r.days != null ? '<div class="dp-flag ' + (r.days <= 7 ? 'warn' : '') + '">דוחות רבעוניים בעוד ' + r.days + ' ימים (' + esc(r.earn.date) + ')</div>' : '';
-    return '<section class="dp-card"><h3>פונדמנטל <small>' + (s && s.score != null ? 'ציון יסוד ' + s.score + '/100' : '') + '</small></h3>' + ed + '<div class="dp-fgrid">' + tiles + '</div>' + pos + recH + notes + '</section>';
+    return '<section class="dp-card"><h3>נתוני החברה <small>' + (s && s.score != null ? 'ציון יסוד ' + s.score + '/100' : '') + '</small></h3>' + ed + '<div class="dp-fgrid">' + tiles + '</div>' + pos + recH + notes + '</section>';
   }
   function newsHtml(r) {
     var n = r.news; if (!n || !n.items || !n.items.length) return '';
@@ -450,7 +454,7 @@
   }
   function aiHtml(r, m) {
     var t = r.ai[m.mode];
-    return '<section class="dp-card"><h3>סיכום בעברית <small>AI מסביר, לא מחשב</small></h3>' + (t ? '<div class="dp-ai">' + esc(t).replace(/\n/g, '<br>') + '</div>' : '<button class="btn ghost" id="dpAi">✨ הפק סיכום מנתוני הניתוח</button>') + '</section>';
+    return '<section class="dp-card"><h3>הסבר בעברית</h3>' + (t ? '<div class="dp-ai">' + esc(t).replace(/\n/g, '<br>') + '</div>' : '<button class="btn ghost" id="dpAi">סיכום בעברית</button>') + '</section>';
   }
 
   function paint() {
@@ -534,12 +538,12 @@
   window.openDeep = function (sym) { build(); goPage('p-deep'); onEnter('p-deep'); var q = $q('#dpQ'); if (sym) { q.value = sym; run(sym); } };
 
   /* חיבור לניווט הקיים */
-  GROUPS.trade.splice(1, 0, ['p-deep', 'ניתוח מלא']); PAGE_GROUP['p-deep'] = 'trade';
+  GROUPS.trade.splice(1, 0, ['p-deep', 'ניתוח']); PAGE_GROUP['p-deep'] = 'trade';
   var _enter = onEnter;
   onEnter = function (id) { _enter(id); if (id === 'p-deep') { build(); var q = $q('#dpQ'); if (q && !q.value) q.value = curSym === 'BTC' ? 'BTC/USD' : curSym; fillList(); paint(); } };
   /* כפתור "ניתוח מלא" בסרגל הגרף */
   var snap = document.getElementById('snap');
-  if (snap && !document.getElementById('deepBtn')) { var b = document.createElement('button'); b.className = 'btn small'; b.id = 'deepBtn'; b.textContent = '🧠 ניתוח מלא'; b.onclick = function () { openDeep(curSym === 'BTC' ? 'BTC/USD' : curSym); }; snap.parentNode.insertBefore(b, snap); }
+  if (snap && !document.getElementById('deepBtn')) { var b = document.createElement('button'); b.className = 'btn small'; b.id = 'deepBtn'; b.textContent = 'ניתוח'; b.onclick = function () { openDeep(curSym === 'BTC' ? 'BTC/USD' : curSym); }; snap.parentNode.insertBefore(b, snap); }
   build();
   window.__deep = { getClient: client, trendTemplate: trendTemplate, regimeOf: regimeOf, dayLevels: dayLevels, orbPlan: orbPlan, quality: quality, E: E, buildMode: buildMode, fundScore: fundScore, state: DEEP, run: run };
 })();

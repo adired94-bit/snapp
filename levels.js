@@ -5,7 +5,7 @@
   var $q = function (s) { return document.querySelector(s); };
   var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
   var num = function (n, d) { return n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('en-US', { minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d }); };
-  var KINDS = { demand: ['ביקוש', 'up'], supply: ['היצע', 'down'], fvg_bull: ['FVG שורי', 'up'], fvg_bear: ['FVG דובי', 'down'], ob_bull: ['OB ביקוש', 'up'], ob_bear: ['OB היצע', 'down'], support: ['תמיכה', 'up'], resistance: ['התנגדות', 'down'], level: ['רמה', 'blue'] };
+  var KINDS = { demand: ['ביקוש', 'up'], supply: ['היצע', 'down'], fvg_bull: ['פער עולה', 'up'], fvg_bear: ['פער יורד', 'down'], ob_bull: ['אזור קנייה', 'up'], ob_bear: ['אזור מכירה', 'down'], support: ['תמיכה', 'up'], resistance: ['התנגדות', 'down'], level: ['רמה', 'blue'] };
   var PX = {}, inside = {}, timer = null;
   var lv = function () { D.levels = D.levels || []; return D.levels; };
   var price = function (t) { var q = (typeof LIVE !== 'undefined') && (LIVE[t] || LIVE[t + '/USD']); return q && q.price ? +q.price : PX[t] != null ? PX[t] : null; };
@@ -84,14 +84,14 @@
   function build() {
     if ($q('#p-lvl')) return;
     var sec = document.createElement('section'); sec.className = 'page'; sec.id = 'p-lvl';
-    sec.innerHTML = '<div class="dp-card"><h3>סימון אזור <small>FVG · Order Block · ביקוש · היצע · רמה</small></h3>' +
+    sec.innerHTML = '<div class="dp-card"><h3>רמות מחיר</h3>' +
       '<div class="rc-grid"><label class="rc-f"><span>סימול</span><input id="lvT" type="text" autocapitalize="characters"></label>' +
       '<label class="rc-f"><span>סוג</span><select id="lvK">' + Object.keys(KINDS).map(function (k) { return '<option value="' + k + '">' + KINDS[k][0] + '</option>'; }).join('') + '</select></label>' +
       '<label class="rc-f"><span>מחיר תחתון</span><input id="lvLo" type="number" inputmode="decimal" step="any"></label>' +
       '<label class="rc-f"><span>מחיר עליון (לרמה בודדת, השאר ריק)</span><input id="lvHi" type="number" inputmode="decimal" step="any"></label>' +
       '<label class="rc-f" style="grid-column:1/-1"><span>הערה</span><input id="lvN" type="text"></label></div>' +
-      '<div class="dp-actions" style="grid-template-columns:1fr 1fr"><button class="btn" id="lvAdd">➕ הוסף למעקב</button><button class="btn ghost" id="lvImp">⬇ ייבא מהניתוח האחרון</button></div></div>' +
-      '<div class="dp-tiles" id="lvSum" style="margin-bottom:12px"></div><div class="dp-card"><h3>אזורים במעקב <small>מהקרוב למחיר אל הרחוק</small></h3><div id="lvList"></div></div>';
+      '<div class="dp-actions" style="grid-template-columns:1fr 1fr"><button class="btn" id="lvAdd">הוסף</button><button class="btn ghost" id="lvImp">קח מהניתוח האחרון</button></div></div>' +
+      '<div class="dp-tiles" id="lvSum" style="margin-bottom:12px"></div><div class="dp-card"><h3>הרמות שלי</h3><div id="lvList"></div></div>';
     document.querySelector('main').appendChild(sec);
     $q('#lvAdd').onclick = async function () {
       var t = $q('#lvT').value.trim().toUpperCase().replace('/USD', ''), lo = +$q('#lvLo').value, hi = $q('#lvHi').value === '' ? lo : +$q('#lvHi').value;
@@ -102,7 +102,7 @@
     };
     $q('#lvImp').onclick = function () { var r = window.__deep && window.__deep.state.res; if (!r) return toast('אין ניתוח מלא אחרון. נתח טיקר קודם'); addLevelsFromAnalysis(r, window.__deep.state.mode); };
   }
-  GROUPS.scan.push(['p-lvl', 'רמות מפתח']); PAGE_GROUP['p-lvl'] = 'scan';
+  GROUPS.scan.push(['p-lvl', 'רמות']); PAGE_GROUP['p-lvl'] = 'scan';
   var _e = onEnter;
   onEnter = function (id) { _e(id); if (id === 'p-lvl') { build(); var t = $q('#lvT'); if (t && !t.value) t.value = (typeof curSym !== 'undefined' ? curSym : '').replace('/USD', ''); pull().then(render); render(); } };
   build();

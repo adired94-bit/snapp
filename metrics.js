@@ -54,12 +54,12 @@
     else {
       var v = verdict(s), pf = s.pf === Infinity ? '∞' : num(s.pf, 2);
       body = '<div class="dp-tiles mx-tiles">' + tile('רווח נקי', usd(s.net), s.net >= 0 ? 'pos' : 'neg', s.n + ' עסקאות') + tile('אחוז הצלחה', num(s.wr * 100, 0) + '%', '', s.wins + ' מתוך ' + s.n) +
-        tile('Profit Factor', pf, s.pf >= 1.5 ? 'pos' : s.pf >= 1 ? '' : 'neg', 'סך רווחים ÷ סך הפסדים') + tile('תוחלת לעסקה', usd(s.exp), s.exp >= 0 ? 'pos' : 'neg', s.expR != null ? num(s.expR, 2) + 'R ממוצע (' + s.rN + ' עסקאות עם סיכון)' : 'אין נתוני R') +
+        tile('גורם רווח', pf, s.pf >= 1.5 ? 'pos' : s.pf >= 1 ? '' : 'neg', 'סך רווחים ÷ סך הפסדים') + tile('תוחלת לעסקה', usd(s.exp), s.exp >= 0 ? 'pos' : 'neg', s.expR != null ? num(s.expR, 2) + 'R ממוצע (' + s.rN + ' עסקאות עם סיכון)' : 'אין נתוני R') +
         tile('רווח ממוצע', usd(s.aw), 'pos') + tile('הפסד ממוצע', usd(s.al), 'neg', s.payoff != null ? 'יחס ' + num(s.payoff, 2) + ':1' : '') + tile('ירידה מקסימלית', usd(s.dd), 'neg') +
         tile('סדרה נוכחית', s.cur + (s.curWin ? ' רווחים' : ' הפסדים'), s.curWin ? 'pos' : 'neg', 'שיא: ' + s.mw + ' רווחים · ' + s.ml + ' הפסדים') + tile('עסקה הכי טובה', usd(s.best), 'pos') + tile('עסקה הכי גרועה', usd(s.worst), 'neg') + tile('זמן החזקה ממוצע', holdTxt(s.hold)) + '</div>' +
         '<ul class="dp-gates" style="margin-top:10px"><li class="' + (v[0] === 'ok' ? 'ok' : v[0] === 'no' ? 'no' : 'un') + '"><i>' + (v[0] === 'ok' ? '✓' : v[0] === 'no' ? '✕' : '!') + '</i><div>' + v[1] + '</div></li></ul>' + weekly(C);
     }
-    box.innerHTML = '<div class="dp-card"><h3>כרטיס ביצועים <small>תוחלת, Profit Factor וסדרות</small></h3>' + chips + body + '</div>';
+    box.innerHTML = '<div class="dp-card"><h3>ביצועים</h3>' + chips + body + '</div>';
     box.querySelectorAll('#kpiTabs button').forEach(function (b) { b.onclick = function () { PERIOD = b.dataset.p; render(); }; });
   }
   var _rs = renderStats;

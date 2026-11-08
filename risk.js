@@ -51,7 +51,7 @@
   function build() {
     if ($q('#p-calc')) return;
     var sec = document.createElement('section'); sec.className = 'page'; sec.id = 'p-calc';
-    sec.innerHTML = '<div class="dp-card rc-card"><h3>מחשבון ניהול סיכונים <small>הכמות נגזרת מהסיכון, לא מהתחושה</small></h3>' +
+    sec.innerHTML = '<div class="dp-card rc-card"><h3>מחשבון <small>כמה לקנות</small></h3>' +
       '<div class="dp-seg" id="rcType">' + Object.keys(TYPES).map(function (k) { return '<button data-t="' + k + '">' + TYPES[k] + '</button>'; }).join('') + '</div>' +
       '<div class="rc-grid">' + field('rcSym', 'סימול (לא חובה)', 'text', 'autocapitalize="characters"') + field('rcAcct', 'גודל תיק ($)') +
       '<div class="rc-f"><span>סיכון לעסקה</span><div class="rc-risk"><input id="rcRiskV" type="number" inputmode="decimal" step="any"><div class="dp-seg" id="rcBy"><button data-b="pct">%</button><button data-b="usd">$</button></div></div></div>' +
@@ -95,7 +95,7 @@
       tile('שווי פוזיציה', '$' + num(r.notional, 0), '', r.notionalPct != null ? num(r.notionalPct, 0) + '% מהתיק' : '') + (r.margin !== r.notional ? tile('מרווח נדרש', '$' + num(r.margin, 0), '', 'מינוף ' + ST.lev + 'x') : tile('סטופ', '$' + num(r.st, r.st < 10 ? 4 : 2), 'neg')) +
       tg + (r.liq != null ? tile('מחיר חיסול (הערכה)', '$' + num(r.liq, 2), 'neg', 'בהנחת מרווח אחזקה 0.5%') : '') + '</div>' +
       '<ul class="dp-gates" style="margin-top:12px">' + warns + '</ul>' +
-      '<div class="dp-actions"><button class="btn" id="rcSave">📓 שמור ליומן כעסקה מתוכננת</button><button class="btn ghost" id="rcCopy">⎘ העתק</button><button class="btn ghost" id="rcDeep">🧠 נתח את הנכס</button></div></div>';
+      '<div class="dp-actions"><button class="btn" id="rcSave">שמור ליומן</button><button class="btn ghost" id="rcCopy">העתק</button><button class="btn ghost" id="rcDeep">ניתוח</button></div></div>';
     $q('#rcSave').onclick = save_; $q('#rcCopy').onclick = copy_; $q('#rcDeep').onclick = function () { if (!ST.sym) return toast('הזן סימול'); openDeep(String(ST.sym).toUpperCase()); };
   }
   function text() { var r = OUT, s = String(ST.sym || '').toUpperCase(); return (s ? s + ' · ' : '') + (r.long ? 'לונג' : 'שורט') + '\nכניסה ' + num(r.e, 2) + ' · סטופ ' + num(r.st, 2) + '\n' + r.tgt.map(function (t, i) { return 'יעד ' + (i + 1) + ' (' + t.r + 'R): ' + num(t.price, 2); }).join('\n') + '\nכמות ' + num(r.qty, 4) + ' ' + r.unitName + ' · סיכון $' + num(r.risk, 0); }
