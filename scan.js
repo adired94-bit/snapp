@@ -11,13 +11,19 @@
   var num = function (n, d) { return n == null || !isFinite(n) ? '–' : Number(n).toLocaleString('en-US', { minimumFractionDigits: d == null ? 2 : d, maximumFractionDigits: d == null ? 2 : d }); };
   var px = function (n) { return n == null || !isFinite(n) ? '–' : Math.abs(n) >= 10 ? num(n, 2) : num(n, 3); };
   var KEY = 'adir-scan3';
-  var FAST = ('AAPL MSFT NVDA GOOGL AMZN META TSLA AVGO AMD NFLX COST ADBE CRM ORCL INTC QCOM MU TXN AMAT LRCX KLAC PLTR SMCI ARM TSM UBER SHOP COIN MSTR MARA RIOT HOOD SOFI PYPL JPM BAC GS V MA WMT HD NKE MCD SBUX DIS BA CAT LMT GE XOM CVX OXY LLY UNH PFE MRNA ABBV NVO ENPH FSLR SNOW CRWD PANW NET DDOG ANET MRVL').split(' ');
-  var WIDE = FAST.concat(('AMGN GILD REGN VRTX ISRG TMO DHR MRK BMY CVS T VZ TMUS CMCSA PEP KO PG CL MDLZ LOW TGT TJX LULU ABNB BKNG MAR CMG NXPI ON ASML FTNT TEAM WDAY NOW INTU ADP SPGI BLK SCHW AXP C WFC MS USB COP EOG MPC PSX DVN HAL FCX NEM NUE ALB LIN UPS FDX DAL UAL AAL LUV CCL RCL F GM RIVN LCID DKNG PINS SNAP RBLX U TTD DOCU ZM OKTA TWLO MELI SE BABA PDD JD BIDU SPOT ETSY CHWY EBAY').split(' '));
-  var uniq = function (a) { var s = {}; return a.filter(function (x) { return !s[x] && (s[x] = 1); }); };
-  FAST = uniq(FAST); WIDE = uniq(WIDE);
-  var ST = { mode: 'fast', busy: false, stop: false, stage: 0, done: 0, total: 0, msg: '', report: null, custom: '' };
-  try { var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if (sv && sv.rows) ST.report = sv; } catch (e) { }
-  var persist = function () { try { var r = ST.report; localStorage.setItem(KEY, JSON.stringify({ at: r.at, mode: r.mode, regime: r.regime, rows: r.rows, s1: r.s1.slice(0, 60), universe: r.universe, failed: r.failed })); } catch (e) { } };
+  var SECTORS = [
+    { k: 'semi', n: 'שבבים ו-AI', s: 'NVDA AMD AVGO MU TSM ARM SMCI MRVL ANET' },
+    { k: 'sw', n: 'תוכנה וענן', s: 'MSFT CRM ORCL PLTR SNOW CRWD PANW NET DDOG NOW' },
+    { k: 'mega', n: 'מגה-טק ואינטרנט', s: 'AAPL GOOGL AMZN META NFLX UBER SHOP ADBE' },
+    { k: 'fin', n: 'פיננסים וקריפטו', s: 'JPM BAC GS MS V MA COIN MSTR HOOD SOFI' },
+    { k: 'health', n: 'בריאות ופארמה', s: 'LLY UNH PFE MRNA ABBV NVO AMGN REGN VRTX' },
+    { k: 'energy', n: 'אנרגיה', s: 'XOM CVX OXY SLB COP EOG MPC HAL' },
+    { k: 'cons', n: 'צריכה וקמעונאות', s: 'WMT COST HD NKE MCD SBUX LULU TGT' },
+    { k: 'ind', n: 'תעשייה וביטחוני', s: 'BA CAT LMT RTX GE DE UPS FDX' },
+    { k: 'auto', n: 'רכב ואנרגיה ירוקה', s: 'TSLA RIVN LCID GM F ENPH FSLR' }].map(function (x) { return { k: x.k, n: x.n, syms: x.s.split(' ') }; });
+  var ST = { mode: 'sectors', spec: true, busy: false, stop: false, stage: 0, done: 0, total: 0, msg: '', report: null };
+  try { var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if (sv && sv.rows && sv.sectors) ST.report = sv; } catch (e) { }
+  var persist = function () { try { var r = ST.report; localStorage.setItem(KEY, JSON.stringify({ at: r.at, mode: r.mode, regime: r.regime, rows: r.rows, sectors: r.sectors, universe: r.universe, failed: r.failed, spec: r.spec })); } catch (e) { } };
 
   /* ---------- עזרים ---------- */
   function parseSyms(text) {
@@ -39,10 +45,10 @@
 
   /* ---------- שלב 1: סריקה מהירה (Finnhub) ---------- */
   function s1row(sym, q, mm) {
-    if (!q || !(q.c > 0)) return { sym: sym, err: 'אין מחיר' };
-    var m = (mm && mm.metric) || {}, price = q.c, g = function (k) { var v = m[k]; return v != null && isFinite(v) ? v : null; };
-    var gap = q.pc > 0 && q.o > 0 ? (q.o / q.pc - 1) * 100 : null, hi = g('52WeekHigh'), lo = g('52WeekLow');
-    var dHi = hi ? (price / hi - 1) * 100 : null, dLo = lo ? (price / lo - 1) * 100 : null;
+    if (q && !(q.c > 0)) return { sym: sym, err: 'אין מחיר' };
+    var m = (mm && mm.metric) || {}, price = q ? q.c : null, g = function (k) { var v = m[k]; return v != null && isFinite(v) ? v : null; };
+    var gap = q && q.pc > 0 && q.o > 0 ? (q.o / q.pc - 1) * 100 : null, hi = g('52WeekHigh'), lo = g('52WeekLow');
+    var dHi = hi && price ? (price / hi - 1) * 100 : null, dLo = lo && price ? (price / lo - 1) * 100 : null;
     var rs13 = g('priceRelativeToS&P50013Week'), rs26 = g('priceRelativeToS&P50026Week'), r13 = g('13WeekPriceReturnDaily'), r26 = g('26WeekPriceReturnDaily');
     var fs = DP.fundScore({ metric: m, rec: null }, price), L = 0, S_ = 0;
     if (dHi != null) { if (dHi >= -8) L += 2; else if (dHi >= -20) L += 1; if (dHi <= -40) S_ += 2; else if (dHi <= -25) S_ += 1; }
@@ -52,21 +58,26 @@
     if (r13 != null) { L += r13 > 15 ? 1 : 0; S_ += r13 < -15 ? 1 : 0; }
     if (gap != null) { L += gap > 2 ? 1 : 0; S_ += gap < -2 ? 1 : 0; }
     if (fs && fs.score != null) { L += fs.score >= 65 ? 1 : 0; S_ += fs.score <= 35 ? 1 : 0; }
-    return { sym: sym, price: price, chg: q.dp, gap: gap, dHi: dHi, dLo: dLo, rs13: rs13, rs26: rs26, r13: r13, fs: fs ? fs.score : null, fsNotes: fs ? fs.notes : [], L: L, S: S_, metric: m };
+    return { sym: sym, price: price, chg: q ? q.dp : null, gap: gap, dHi: dHi, dLo: dLo, rs13: rs13, rs26: rs26, r13: r13, fs: fs ? fs.score : null, fsNotes: fs ? fs.notes : [], L: L, S: S_, metric: m };
   }
-  async function stage1(syms) {
-    ST.stage = 1; ST.done = 0; ST.total = syms.length; var rows = [], bad = [];
-    await pool(syms, 5, async function (sym) {
-      try { var q = await fh('/quote?symbol=' + encodeURIComponent(sym)), m = await fh('/stock/metric?symbol=' + encodeURIComponent(sym) + '&metric=all'), r = s1row(sym, q, m); if (r.err) bad.push({ sym: sym, err: r.err }); else rows.push(r); }
-      catch (e) { bad.push({ sym: sym, err: e.message }); if (/401|403/.test(e.message)) ST.stop = true; }
-      ST.done++; setMsg('סורק את השוק: ' + ST.done + ' מתוך ' + syms.length + ' מניות');
+  async function stage1(groups) {
+    ST.stage = 1; ST.done = 0; var all = []; groups.forEach(function (g) { g.syms.forEach(function (sym) { all.push({ sym: sym, g: g }); }); }); ST.total = all.length; var bad = [];
+    await pool(all, 5, async function (it) {
+      try { var m = await fh('/stock/metric?symbol=' + encodeURIComponent(it.sym) + '&metric=all'), r = s1row(it.sym, null, m); if (r.err) bad.push({ sym: it.sym, err: r.err }); else { r.sector = it.g.n; it.g.rows = (it.g.rows || []); it.g.rows.push(r); } }
+      catch (e) { bad.push({ sym: it.sym, err: e.message }); if (/401|403/.test(e.message)) ST.stop = true; }
+      ST.done++; setMsg('סורק סקטורים: ' + ST.done + ' מתוך ' + all.length + ' מניות');
     });
-    return { rows: rows, bad: bad };
+    return bad;
   }
-  function shortlist(rows, kL, kS) {
-    var L = rows.slice().sort(function (a, b) { return b.L - a.L || (b.rs13 || 0) - (a.rs13 || 0); }).filter(function (r) { return r.L >= 3; }).slice(0, kL);
-    var S_ = rows.slice().sort(function (a, b) { return b.S - a.S || (a.rs13 || 0) - (b.rs13 || 0); }).filter(function (r) { return r.S >= 3; }).slice(0, kS);
-    var seen = {}, out = []; L.concat(S_).forEach(function (r) { if (!seen[r.sym]) { seen[r.sym] = 1; r.side1 = L.indexOf(r) >= 0 ? 'long' : 'short'; out.push(r); } }); return out;
+  /* מכל סקטור בוחרים את n החזקות ביותר (לונג או שורט, לפי הציון המהיר הגבוה) */
+  function pickPerSector(groups, n) {
+    var out = [];
+    groups.forEach(function (g) {
+      var rows = (g.rows && g.rows.length ? g.rows : g.syms.map(function (s) { return { sym: s, sector: g.n, L: 0, S: 0 }; })).slice();
+      rows.sort(function (a, b) { return Math.max(b.L, b.S) - Math.max(a.L, a.S) || Math.abs(b.rs13 || 0) - Math.abs(a.rs13 || 0); });
+      rows.slice(0, n).forEach(function (r) { r.sector = g.n; r.gk = g.k; r.side1 = r.L >= r.S ? 'long' : 'short'; out.push(r); });
+    });
+    return out;
   }
 
   /* ---------- שלב 2: ניתוח טכני (Twelve Data) ---------- */
@@ -103,53 +114,91 @@
     cn = Math.max(-8, Math.min(8, cn)); add('נרות', cn, pn.length ? pn.join(', ') : 'אין תבנית');
     var rs = r.rs6 != null ? Math.max(-5, Math.min(5, r.rs6 * sg / 4)) : 0; add('חוזק יחסי', rs, r.rs6 != null ? (r.rs6 >= 0 ? '+' : '') + r.rs6.toFixed(1) + ' מול SPY' : 'אין נתון');
     var rg = 0; if (regime) { var counter = (r.dir === 'long' && regime.state === 'off') || (r.dir === 'short' && regime.state === 'on'); rg = counter ? -8 : (regime.state === 'mixed' ? 0 : 3); add('מצב שוק', rg, regime.label + (counter ? ' (נגד)' : '')); }
+    var gp = 0; if (r.gap != null) { var ag = r.gap * sg; gp = ag >= 2 ? 2 : ag <= -2 ? -2 : 0; if (gp) add('גאפ', gp, (r.gap >= 0 ? '+' : '') + r.gap.toFixed(1) + '% בפתיחה'); }
     var er = 0; if (r.earnDays != null && r.earnDays >= 0 && r.earnDays <= 7) { er = -5; risks.push('דוחות בעוד ' + r.earnDays + ' ימים: פער מחיר אפשרי'); } if (er) add('דוחות', er, 'בעוד ' + r.earnDays + ' ימים');
-    var total = Math.max(0, Math.min(100, Math.round(tech + tt + f + an + cn + rs + rg + er)));
+    var total = Math.max(0, Math.min(100, Math.round(tech + tt + f + an + cn + rs + rg + er + gp)));
     br.forEach(function (b) { if (b.v >= 3) why.push(b.k + ': ' + b.label); else if (b.v <= -3) risks.push(b.k + ': ' + b.label + ' (נגד הכיוון)'); });
     var step = total >= 65 && Math.abs(r.score) >= 30 ? 2 : total >= 45 ? 1 : 0;
-    if (r.gap != null && Math.abs(r.gap) >= 4) why.push('גאפ ' + (r.gap >= 0 ? '+' : '') + r.gap.toFixed(1) + '% בפתיחה');
     r.comp = total; r.br = br; r.why = why; r.risks = risks; r.step = step; return r;
   }
-  async function enrich(rows, spy, regime) {
-    ST.stage = 3; ST.done = 0; ST.total = rows.length;
-    await pool(rows, 4, async function (r) {
-      if (S.fh && r.sym.indexOf('/') < 0) {
-        try { var rec = await fh('/stock/recommendation?symbol=' + encodeURIComponent(r.sym)); if (Array.isArray(rec) && rec.length) { var calc = function (x) { var t = (x.strongBuy || 0) + (x.buy || 0) + (x.hold || 0) + (x.sell || 0) + (x.strongSell || 0); return t ? { share: ((x.strongBuy || 0) + (x.buy || 0)) / t, tot: t } : null; }, a = calc(rec[0]), b = rec[1] ? calc(rec[1]) : null; if (a) r.rec = { share: a.share, tot: a.tot, d: b ? (a.share - b.share) * 100 : null, period: rec[0].period }; } } catch (e) { }
-        try { var er = await DP.getClient().earnings(r.sym); if (er && er.date) r.earnDays = Math.round((Date.parse(er.date) - Date.now()) / 864e5); } catch (e) { }
+  function mkPlan(entry, atr, dir) { var risk = atr * 1.5, long = dir === 'long', qty = risk > 0 && S.risk > 0 ? Math.floor(S.risk / risk) : 0, ml = +S.maxLev > 0 ? +S.maxLev : 1; if (S.acct > 0 && entry > 0) qty = Math.min(qty, Math.floor(S.acct * ml / entry)); return { entry: entry, stop: long ? entry - risk : entry + risk, t1: long ? entry + 2 * risk : entry - 2 * risk, t2: long ? entry + 3 * risk : entry - 3 * risk, qty: qty, riskUsd: qty * risk, atr: atr }; }
+  async function fhEnrich(r) {
+    if (!S.fh || r.sym.indexOf('/') >= 0) return;
+    try { var q = await fh('/quote?symbol=' + encodeURIComponent(r.sym)); if (q && q.c > 0) { r.q = q.c; r.chg = q.dp; r.gap = q.pc > 0 && q.o > 0 ? (q.o / q.pc - 1) * 100 : null; } } catch (e) { }
+    try { var rec = await fh('/stock/recommendation?symbol=' + encodeURIComponent(r.sym)); if (Array.isArray(rec) && rec.length) { var calc = function (x) { var t = (x.strongBuy || 0) + (x.buy || 0) + (x.hold || 0) + (x.sell || 0) + (x.strongSell || 0); return t ? { share: ((x.strongBuy || 0) + (x.buy || 0)) / t, tot: t } : null; }, a = calc(rec[0]), b = rec[1] ? calc(rec[1]) : null; if (a) r.rec = { share: a.share, tot: a.tot, d: b ? (a.share - b.share) * 100 : null, period: rec[0].period }; } } catch (e) { }
+    try { var er = await DP.getClient().earnings(r.sym); if (er && er.date) r.earnDays = Math.round((Date.parse(er.date) - Date.now()) / 864e5); } catch (e) { }
+  }
+  /* ניתוח טכני (Twelve Data, אחד אחרי השני) ואנליסטים/מחיר/דוחות (Finnhub, במקביל) */
+  async function deepAll(list, spy, regime, failed) {
+    ST.stage = 2; var td = 0, fhd = 0, n = list.length; ST.total = n; ST.done = 0; var okRows = [];
+    var upd = function () { ST.done = td; setMsg('ניתוח טכני ' + td + '/' + n + ' · אנליסטים ומחירים ' + fhd + '/' + n); };
+    var c = DP.getClient();
+    var techLoop = (async function () {
+      for (var i = 0; i < n && !ST.stop; i++) {
+        var d = list[i];
+        try { var bars = d.sym === 'SPY' && spy ? spy : await c.series(d.sym, '1day', 300), t = technical(d.sym, bars, spy); if (t.err) failed.push({ sym: d.sym, err: t.err }); else { Object.assign(d, t); d.zones = { poc: t.a.poc, vah: t.a.vah, val: t.a.val }; delete d.a; okRows.push(d); } }
+        catch (e) { failed.push({ sym: d.sym, err: e.message }); }
+        td++; upd();
       }
-      composite(r, regime); ST.done++; setMsg('אנליסטים ודוחות: ' + ST.done + ' מתוך ' + rows.length);
-    });
+    })();
+    var fhLoop = pool(list, 4, async function (r) { await fhEnrich(r); fhd++; upd(); });
+    await Promise.all([techLoop, fhLoop]);
+    okRows.forEach(function (r) { if (r.q) { r.price = r.q; r.plan = mkPlan(r.q, r.plan.atr, r.dir); } else r.price = r.plan.entry; delete r.metric; composite(r, regime); });
+    return okRows;
+  }
+
+  /* ---------- מניות ספקולטיביות עד $5 עם קטליזטור ---------- */
+  var CAT = { fda: 'החלטת FDA', trial: 'ניסוי קליני', earnings: 'דוח רבעוני', contract: 'חוזה / עסקה', news: 'חדשות', other: 'אחר' };
+  var SPEC_SYS = 'אתה חוקר שוק הון עבור סוחר ישראלי. חפש ברשת מניות אמריקאיות לא מוכרות (שווי שוק קטן, עד 2 מיליארד דולר) שנסחרות מתחת ל-5 דולר, ויש להן קטליזטור קרוב שיכול להזיז אותן בחדות: החלטת FDA (תאריך PDUFA), פרסום תוצאות ניסוי קליני, דוח רבעוני, חוזה, עסקה או חדשות מהותיות. ' +
+    'מקורות מועדפים: biopharmcatalyst.com, investing.com, marketbeat.com, fda.gov, הודעות החברות. חוק ברזל: כלול רק מה שמצאת בפועל, עם קישור למקור. אסור להמציא טיקר, תאריך או אירוע. אם לא מצאת, החזר רשימה ריקה. ' +
+    'החזר JSON בלבד: {"items":[{"ticker":"ABCD","catalyst_type":"fda|trial|earnings|contract|news|other","catalyst":"תיאור קצר בעברית","date":"YYYY-MM-DD או ריק","why":"למה עלולה לזנק, משפט בעברית","risk":"הסיכון המרכזי, משפט בעברית","source":"שם האתר","url":"קישור"}]}. עד 14 פריטים, מהקרוב לרחוק.';
+  async function spec() {
+    if (!aiKey()) return { err: 'לחיפוש מניות ספקולטיביות צריך מפתח בינה (Anthropic או Gemini) בהגדרות' };
+    if (!S.fh) return { err: 'לאימות מחירים צריך מפתח Finnhub' };
+    try {
+      var raw = await claude([{ role: 'user', content: 'היום: ' + new Date().toISOString().slice(0, 10) + '. מצא מניות כאלה לחודש הקרוב.' }], { system: SPEC_SYS, tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6 }], max_tokens: 3800, tier: 'smart' });
+      var j = parseJSON(raw), cand = (j.items || []).filter(function (i) { return i && i.ticker && i.catalyst && i.url && /^https?:/.test(i.url); }), out = [], seen = {};
+      for (var k = 0; k < cand.length && out.length < 9; k++) {
+        var i = cand[k], tk = String(i.ticker).toUpperCase().replace(/[^A-Z.]/g, ''); if (!tk || seen[tk]) continue; seen[tk] = 1;
+        try {
+          var q = await fh('/quote?symbol=' + tk), pr = await fh('/stock/profile2?symbol=' + tk);
+          if (!(q && q.c > 0) || !(pr && pr.name)) continue; /* אימות: טיקר קיים ויש לו מחיר */
+          out.push({ sym: tk, name: pr.name, price: q.c, chg: q.dp, cap: pr.marketCapitalization, ind: pr.finnhubIndustry, type: CAT[i.catalyst_type] ? i.catalyst_type : 'other', catalyst: i.catalyst, date: i.date || '', why: i.why || '', risk: i.risk || '', source: i.source || 'מקור', url: i.url });
+        } catch (e) { }
+      }
+      var low = out.filter(function (x) { return x.price <= 5; }), hi = out.filter(function (x) { return x.price > 5 && x.price <= 10; });
+      var items = low.concat(hi).slice(0, 5); items.forEach(function (x) { x.over5 = x.price > 5; });
+      return { items: items, found: cand.length, validated: out.length, at: Date.now() };
+    } catch (e) { return { err: 'החיפוש נכשל: ' + e.message }; }
   }
 
   /* ---------- הרצה ---------- */
   async function run(opts) {
     if (ST.busy) { ST.stop = true; return; }
-    opts = opts || {}; var mode = opts.mode || ST.mode, custom = opts.custom;
+    opts = opts || {}; var mode = opts.custom ? 'custom' : (opts.mode || ST.mode);
     if (!S.td) return toast('צריך מפתח Twelve Data בהגדרות (⚙️)');
-    var universe = custom && custom.length ? custom : mode === 'wide' ? WIDE : mode === 'mine' ? mine() : FAST;
-    if (!universe.length) return toast('אין מניות לסרוק');
-    if (!S.fh && universe.length > 12) return toast('לסריקה רחבה צריך מפתח Finnhub. עם עד 12 מניות אפשר גם בלעדיו');
-    ST.busy = true; ST.stop = false; ST.mode = custom && custom.length ? 'custom' : mode; paint();
-    var c = DP.getClient(), report = { at: Date.now(), mode: ST.mode, universe: universe.length, regime: null, rows: [], s1: [], failed: [] };
+    var groups, per = mode === 'quick' ? 3 : 5, sectorMode = mode === 'sectors' || mode === 'quick';
+    if (mode === 'custom') groups = [{ k: 'custom', n: 'הרשימה שלך', syms: opts.custom.slice(0, 20) }];
+    else if (mode === 'mine') groups = [{ k: 'mine', n: 'הרשימות שלי', syms: mine().slice(0, 30) }];
+    else groups = SECTORS.map(function (g) { return { k: g.k, n: g.n, syms: g.syms.slice() }; });
+    if (!groups[0].syms.length) return toast('אין מניות לסרוק');
+    if (sectorMode && !S.fh) toast('בלי מפתח Finnhub הסריקה לוקחת את המניות הראשונות בכל סקטור, בלי דירוג מקדים');
+    ST.busy = true; ST.stop = false; ST.mode = mode; paint();
+    var c = DP.getClient(), report = { at: Date.now(), mode: mode, universe: groups.reduce(function (a, g) { return a + g.syms.length; }, 0), regime: null, rows: [], sectors: [], failed: [], spec: null };
+    var specP = sectorMode && ST.spec ? spec() : Promise.resolve(null);
     try {
-      var s1 = { rows: [], bad: [] }, deep;
-      if (universe.length > 20 && S.fh) { s1 = await stage1(universe); report.s1 = s1.rows.map(function (r) { var o = Object.assign({}, r); delete o.metric; delete o.fsNotes; return o; }); report.failed = s1.bad; if (!s1.rows.length) throw new Error('לא התקבלו נתונים מ-Finnhub. הרץ "בדיקת חיבורים" כדי לראות למה.'); deep = shortlist(s1.rows, 12, 8); }
-      else deep = universe.map(function (s) { return { sym: s }; });
-      if (!deep.length) throw new Error('אף מניה לא עברה את הסינון המהיר. נסה סריקה רחבה.');
-      ST.stage = 2; ST.done = 0; ST.total = deep.length + 1; setMsg('בודק את מצב השוק (SPY)…');
-      var spy = null; try { spy = await c.series('SPY', '1day', 300); } catch (e) { } ST.done = 1;
-      report.regime = DP.regimeOf(spy); var out = [];
-      for (var i = 0; i < deep.length && !ST.stop; i++) {
-        var d = deep[i]; setMsg('ניתוח טכני: ' + d.sym + ' (' + (i + 1) + ' מתוך ' + deep.length + ')');
-        try { var bars = d.sym === 'SPY' && spy ? spy : await c.series(d.sym, '1day', 300), t = technical(d.sym, bars, spy); if (t.err) report.failed.push({ sym: d.sym, err: t.err }); else { var row = Object.assign({}, d, t); delete row.a; row.zones = { poc: t.a.poc, vah: t.a.vah, val: t.a.val }; row.price = t.plan.entry; out.push(row); } }
-        catch (e) { report.failed.push({ sym: d.sym, err: e.message }); }
-        ST.done = i + 2;
-      }
-      await enrich(out, spy, report.regime);
-      out.forEach(function (r) { delete r.metric; });
-      out.sort(function (a, b) { return b.step - a.step || b.comp - a.comp; });
-      report.rows = out; ST.report = report; persist();
-      setMsg(ST.stop ? 'הסריקה נעצרה' : '');
+      var list;
+      if (sectorMode && S.fh) { report.failed = await stage1(groups); if (!groups.some(function (g) { return g.rows && g.rows.length; })) throw new Error('לא התקבלו נתונים מ-Finnhub. הרץ "בדיקת חיבורים" כדי לראות למה.'); }
+      list = sectorMode ? pickPerSector(groups, per) : groups[0].syms.map(function (sym) { return { sym: sym, sector: groups[0].n, gk: groups[0].k }; });
+      ST.stage = 2; setMsg('בודק את מצב השוק (SPY)…'); var spy = null; try { spy = await c.series('SPY', '1day', 300); } catch (e) { }
+      report.regime = DP.regimeOf(spy);
+      var rows = await deepAll(list, spy, report.regime, report.failed);
+      rows.sort(function (a, b) { return b.step - a.step || b.comp - a.comp; });
+      report.rows = rows;
+      report.sectors = groups.map(function (g) { return { k: g.k, n: g.n, rows: rows.filter(function (r) { return r.gk === g.k; }) }; }).filter(function (g) { return g.rows.length; });
+      ST.report = report; persist();
+      setMsg(ST.stop ? 'הסריקה נעצרה' : 'מחפש מניות ספקולטיביות…'); paint(); renderHome();
+      report.spec = await specP; ST.report = report; persist(); setMsg(ST.stop ? 'הסריקה נעצרה' : '');
     } catch (e) { setMsg('הסריקה נכשלה: ' + e.message); toast(e.message.slice(0, 80)); }
     ST.busy = false; ST.stage = 0; paint(); renderHome();
   }
@@ -187,31 +236,61 @@
       '<div class="sm-pl"><span>כניסה <b>$' + px(p.entry) + '</b></span><span>סטופ <b class="down">$' + px(p.stop) + '</b></span><span>יעד 1 <b class="up">$' + px(p.t1) + '</b></span><span>יעד 2 <b class="up">$' + px(p.t2) + '</b></span><span>כמות <b>' + (p.qty || '–') + '</b></span></div>' +
       '<div class="sm-a"><button data-a="deep">🧠 ניתוח מלא</button><button data-a="calc">🧮 מחשבון</button><button data-a="save">📓 שמור ליומן</button></div></div>';
   }
+  function specCard(x) {
+    var days = x.date ? Math.round((Date.parse(x.date) - Date.now()) / 864e5) : null, cap = x.cap != null ? (x.cap >= 1000 ? '$' + num(x.cap / 1000, 1) + 'B' : '$' + num(x.cap, 0) + 'M') : '–';
+    var risk$ = S.risk > 0 ? S.risk * 0.25 : 0, stop = x.price * 0.85, qty = risk$ > 0 ? Math.floor(risk$ / (x.price * 0.15)) : 0;
+    return '<div class="sm-r long sp" data-s="' + esc(x.sym) + '"><div class="sm-h"><b class="tk">' + esc(x.sym) + '</b><span class="sm-px">$' + px(x.price) + (x.chg != null ? ' <em class="' + (x.chg >= 0 ? 'up' : 'down') + '">' + (x.chg >= 0 ? '+' : '') + num(x.chg, 1) + '%</em>' : '') + '</span><span class="sm-v long">' + CAT[x.type] + (days != null && days >= 0 ? ' · בעוד ' + days + ' ימים' : '') + '</span></div>' +
+      '<div class="sm-kv">' + esc(x.name) + ' · שווי שוק ' + cap + (x.ind ? ' · ' + esc(x.ind) : '') + (x.over5 ? ' · <em class="warn">מעל $5</em>' : '') + '</div>' +
+      '<p class="sp-c">' + esc(x.catalyst) + '</p>' + (x.why ? '<ul class="dp-list pos sc-l"><li>' + esc(x.why) + '</li></ul>' : '') + (x.risk ? '<ul class="dp-list neg sc-l"><li>' + esc(x.risk) + '</li></ul>' : '') +
+      '<div class="sm-pl"><span>כניסה <b>$' + px(x.price) + '</b></span><span>סטופ (−15%) <b class="down">$' + px(stop) + '</b></span><span>גודל שמרני <b>' + (qty || '–') + '</b></span><span>סיכון <b>$' + num(qty * x.price * 0.15, 0) + '</b></span></div>' +
+      '<div class="sm-a"><a class="sp-src" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.source) + ' ↗</a><button data-a="deep">🧠 ניתוח מלא</button><button data-a="save">📓 שמור ליומן</button></div></div>';
+  }
   function paint() {
     var host = $q('#scOut'); if (!host) return;
     var go = $q('#scGo'); if (go) go.textContent = ST.busy ? '⏹ עצור' : '🔎 סרוק את השוק';
     var bar_ = $q('#scBar'); if (bar_) bar_.style.display = ST.busy ? '' : 'none';
     document.querySelectorAll('#scMode button').forEach(function (b) { b.classList.toggle('on', b.dataset.m === ST.mode); });
     var cu = $q('#scCustomW'); if (cu) cu.style.display = ST.mode === 'custom' ? '' : 'none';
+    var sp = $q('#scSpecW'); if (sp) sp.style.display = ST.mode === 'sectors' || ST.mode === 'quick' ? '' : 'none';
     var R = ST.report;
-    if (!R) { host.innerHTML = ST.busy ? '<div class="dp-skel"><i style="height:150px"></i><i style="height:150px"></i></div>' : '<div class="dp-card"><div class="dp-empty">עוד לא נסרק. לחץ "סרוק את השוק". סריקה מהירה של כ-70 מניות לוקחת כ-4 דקות.</div></div>'; return; }
-    var L = R.rows.filter(function (r) { return r.dir === 'long'; }), Sh = R.rows.filter(function (r) { return r.dir === 'short'; }), top = R.rows.filter(function (r) { return r.step === 2; }).length;
+    if (!R) { host.innerHTML = ST.busy ? '<div class="dp-skel"><i style="height:150px"></i><i style="height:150px"></i></div>' : '<div class="dp-card"><div class="dp-empty">עוד לא נסרק. לחץ "סרוק את השוק". סריקה של 5 מכל סקטור לוקחת כ-7 דקות (מהיר: כ-4). אפשר לקרוא תוצאות כבר כשהסקטורים נטענים.</div></div>'; return; }
+    var rows = R.rows, L = rows.filter(function (r) { return r.dir === 'long'; }).length, Sh = rows.length - L, top = rows.filter(function (r) { return r.step === 2; }).length;
     var rg = R.regime ? '<div class="dp-regime ' + R.regime.state + '"><i></i><b>' + R.regime.label + '</b><span>SPY ' + (R.regime.dist >= 0 ? '+' : '') + R.regime.dist.toFixed(1) + '% מממוצע 200</span></div>' : '';
-    var ph = AT.session.phase(Date.now()), when = '<div class="dp-foot" style="text-align:right">סריקה מ-' + new Date(R.at).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' · נסרקו ' + R.universe + ' מניות, נותחו לעומק ' + R.rows.length + ' · כעת: ' + esc(ph.label) + '</div>';
-    var sum = '<div class="sm-sum"><div><b>' + top + '</b><span>כניסה</span></div><div><b class="up">' + L.length + '</b><span>לונג</span></div><div><b class="down">' + Sh.length + '</b><span>שורט</span></div><div><b>' + R.universe + '</b><span>נסרקו</span></div></div>';
-    var sec = function (title, arr) { return arr.length ? '<h2>' + title + ' <small>' + arr.length + '</small></h2>' + arr.map(cardHtml).join('') : ''; };
-    var rest = (R.s1 || []).filter(function (x) { return !R.rows.some(function (r) { return r.sym === x.sym; }); }).slice(0, 25);
-    var restH = rest.length ? '<details class="ht-set"><summary>שאר המניות שנסרקו (' + rest.length + ' מובילות מתוך הסינון המהיר)</summary><div class="sc-rest">' + rest.map(function (x) { return '<div><b>' + esc(x.sym) + '</b><span>$' + px(x.price) + '</span><em class="' + (x.L >= x.S ? 'up' : 'down') + '">' + (x.L >= x.S ? 'לונג ' + x.L : 'שורט ' + x.S) + '</em><small>' + (x.dHi != null ? num(x.dHi, 0) + '% משיא' : '') + (x.rs13 != null ? ' · חוזק ' + num(x.rs13, 0) : '') + '</small></div>'; }).join('') + '</div></details>' : '';
+    var ph = AT.session.phase(Date.now()), when = '<div class="dp-foot" style="text-align:right">סריקה מ-' + new Date(R.at).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' · ' + R.universe + ' מניות בסקטורים, נותחו לעומק ' + rows.length + ' · כעת: ' + esc(ph.label) + '</div>';
+    var sum = '<div class="sm-sum"><div><b>' + top + '</b><span>כניסה</span></div><div><b class="up">' + L + '</b><span>לונג</span></div><div><b class="down">' + Sh + '</b><span>שורט</span></div><div><b>' + rows.length + '</b><span>נותחו</span></div></div>';
+    var jump = '<div class="tabs" id="scJump" style="margin:6px 0 4px">' + (R.sectors || []).map(function (g) { return '<button data-j="sec-' + g.k + '">' + esc(g.n) + '</button>'; }).join('') + (R.spec ? '<button data-j="sec-spec">🚀 ספקולטיביות</button>' : '') + '</div>';
+    var secs = (R.sectors || []).map(function (g) { return '<h2 id="sec-' + g.k + '">' + esc(g.n) + ' <small>' + g.rows.length + ' מניות</small></h2>' + g.rows.slice().sort(function (a, b) { return b.step - a.step || b.comp - a.comp; }).map(cardHtml).join(''); }).join('');
+    var spc = '';
+    if (R.spec) {
+      if (R.spec.err) spc = '<h2 id="sec-spec">🚀 ספקולטיביות עד $5</h2><div class="dp-card"><div class="dp-empty">' + esc(R.spec.err) + '</div></div>';
+      else spc = '<h2 id="sec-spec">🚀 ספקולטיביות עד $5 <small>' + R.spec.items.length + ' מניות</small></h2><div class="dp-flag warn">סיכון גבוה: אירוע בינארי (אישור או דחייה), פערי מחיר, דילול הון ועצירות מסחר. מקצים סכום שאתה מוכן להפסיד כולו. הגודל המוצע הוא 25% מהסיכון הרגיל שלך, וסטופ 15% הוא מסגרת סיכון ולא תחזית. נמצאו ' + R.spec.found + ' מועמדות, ו-' + R.spec.validated + ' עברו אימות של טיקר ומחיר מול Finnhub.</div>' + (R.spec.items.length ? R.spec.items.map(specCard).join('') : '<div class="dp-card"><div class="dp-empty">לא נמצאו כרגע מניות עם קטליזטור מתועד ועם מחיר עד $10.</div></div>');
+    } else if (ST.busy && ST.spec && (ST.mode === 'sectors' || ST.mode === 'quick')) spc = '<h2 id="sec-spec">🚀 ספקולטיביות עד $5</h2><div class="dp-card"><div class="dp-empty"><span class="spin"></span> מחפש ברשת מניות עם קטליזטור…</div></div>';
     var bad = (R.failed || []).length ? '<details class="ht-set"><summary>לא נסרקו (' + R.failed.length + ')</summary>' + R.failed.slice(0, 30).map(function (x) { return '<div class="dp-foot" style="text-align:right">' + esc(x.sym) + ': ' + esc(x.err) + '</div>'; }).join('') + '</details>' : '';
-    host.innerHTML = rg + when + sum + (R.rows.length ? sec('📈 לונג', L) + sec('📉 שורט', Sh) : '<div class="dp-card"><div class="dp-empty">לא נמצאו מניות לניתוח מלא.</div></div>') + restH + bad +
-      '<div class="dp-foot" style="text-align:right;margin-top:10px">הציון המשולב הוא סכום שקוף של טכני (עד 40), תבנית מגמה (15), יסוד (10), אנליסטים (10), נרות (8), חוזק יחסי (5), מצב שוק ודוחות. לא ייעוץ השקעות, והציון אינו הבטחה. נתוני Finnhub חינמיים עשויים להיות מושהים.</div>';
-    host.querySelectorAll('.sm-r').forEach(function (el) {
+    host.innerHTML = rg + when + sum + (R.rows.length ? jump + secs : '<div class="dp-card"><div class="dp-empty">לא נמצאו מניות לניתוח מלא.</div></div>') + spc + bad +
+      '<div class="dp-foot" style="text-align:right;margin-top:10px">הציון המשולב הוא סכום שקוף של טכני (עד 40), תבנית מגמה (15), יסוד (10), אנליסטים (10), נרות (8), חוזק יחסי (5), מצב שוק, גאפ ודוחות. לא ייעוץ השקעות, והציון אינו הבטחה. נתוני Finnhub חינמיים עשויים להיות מושהים.</div>';
+    host.querySelectorAll('#scJump button').forEach(function (b) { b.onclick = function () { var t = document.getElementById(b.dataset.j); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }; });
+    host.querySelectorAll('.sm-r:not(.sp)').forEach(function (el) {
       var r = R.rows.find(function (x) { return x.sym === el.dataset.s; });
       el.querySelectorAll('button').forEach(function (b) { b.onclick = function () {
         if (b.dataset.a === 'deep') openDeep(r.sym);
         else if (b.dataset.a === 'calc') openCalc({ sym: r.sym.replace('/USD', ''), entry: r.plan.entry, stop: r.plan.stop, atr: r.plan.atr, type: r.sym.indexOf('/') >= 0 ? 'crypto' : 'stock' });
         else saveRow(r); }; });
     });
+    host.querySelectorAll('.sm-r.sp').forEach(function (el) {
+      var x = ((R.spec && R.spec.items) || []).find(function (y) { return y.sym === el.dataset.s; });
+      el.querySelectorAll('button').forEach(function (b) { b.onclick = function () { if (b.dataset.a === 'deep') openDeep(x.sym); else saveSpec(x); }; });
+    });
+  }
+  async function saveSpec(x) {
+    var risk$ = S.risk > 0 ? S.risk * 0.25 : 0, stop = x.price * 0.85, qty = risk$ > 0 ? Math.floor(risk$ / (x.price * 0.15)) : 0; if (!qty) return toast('הכמות 0. הגדר סיכון $ בהגדרות');
+    var tr = { id: 't' + Date.now(), mode: MODE, ticker: x.sym, dir: 'long', status: 'planned', created: Date.now(), horizon: 'swing',
+      plan: { entry: x.price, stop: stop, tp: [x.price * 1.3, x.price * 1.45], condition: 'ספקולטיבית: ' + CAT[x.type] + (x.date ? ' ב-' + x.date : ''), reasons: [x.catalyst, x.why].filter(Boolean), pattern: 'קטליזטור', bias: 'long', invalidation: 'סגירה מתחת ל-' + px(stop), analysts: null, news_context: x.url },
+      sizing: { entry: x.price, stop: stop, qty: qty, risk: Math.round(qty * x.price * 0.15), riskPct: S.acct > 0 ? qty * x.price * 0.15 / S.acct * 100 : 0, pos: Math.round(qty * x.price) }, imgs: { chart: null }, qty: qty, entryPrice: null,
+      log: [{ t: Date.now(), type: 'ספקולטיבית', note: x.sym + ' · ' + x.catalyst + '\nמקור: ' + x.url }] };
+    D.trades.push(tr);
+    var pl = D.plans.find(function (p) { return p.ticker === x.sym; }); if (!pl) { pl = { id: x.sym.toLowerCase() + Date.now(), ticker: x.sym, cls: '', checks: [['סטופ מוגדר לפני כניסה', true], ['גודל פוזיציה חושב לפי סיכון', true]] }; D.plans.push(pl); }
+    Object.assign(pl, { status: 'לונג – מתוכנן (ספקולטיבית)', qty: qty, entry: x.price, stop: stop, tp1: x.price * 1.3, tp2: x.price * 1.45, tp3: 0, rules: x.catalyst + '\nסיכון: ' + x.risk });
+    await save(); renderPlans(); renderTrades(); toast('נשמר ביומן כעסקה מתוכננת');
   }
   async function saveRow(r) {
     var p = r.plan; if (!p.qty) return toast('הכמות 0. הגדר סיכון $ וגודל תיק בהגדרות');
@@ -235,11 +314,12 @@
     if (!R || !R.rows.length) { host.innerHTML = pre + '<div class="empty">עוד לא נסרק. <button class="btn small" id="hsGo">🔎 סרוק את השוק</button></div>'; }
     else {
       var pick = function (dir) { return R.rows.filter(function (r) { return r.dir === dir; }).slice(0, 3).map(function (r) { return '<div class="hs-r ' + dir + '" data-s="' + esc(r.sym) + '"><b>' + esc(r.sym) + '</b><span>' + DEC[r.step][1] + '</span><em>' + r.comp + '</em></div>'; }).join('') || '<div class="hs-n">אין</div>'; };
-      host.innerHTML = pre + '<div class="hs-g"><div><h4 class="up">לונג</h4>' + pick('long') + '</div><div><h4 class="down">שורט</h4>' + pick('short') + '</div></div><div class="dp-foot" style="text-align:right">' + (today ? 'סריקה של היום, ' : 'סריקה ישנה מ-') + new Date(R.at).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' <button class="btn ghost small" id="hsOpen">פתח דוח מלא</button> <button class="btn small" id="hsGo">🔎 סרוק שוב</button></div>';
+      var spl = R.spec && R.spec.items && R.spec.items.length ? '<div class="hs-sp"><b>🚀 ספקולטיביות:</b> ' + R.spec.items.slice(0, 5).map(function (x) { return esc(x.sym) + ' $' + px(x.price); }).join(' · ') + '</div>' : '';
+      host.innerHTML = pre + '<div class="hs-g"><div><h4 class="up">לונג</h4>' + pick('long') + '</div><div><h4 class="down">שורט</h4>' + pick('short') + '</div></div>' + spl + '<div class="dp-foot" style="text-align:right">' + (today ? 'סריקה של היום, ' : 'סריקה ישנה מ-') + new Date(R.at).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' <button class="btn ghost small" id="hsOpen">פתח דוח מלא</button> <button class="btn small" id="hsGo">🔎 סרוק שוב</button></div>';
       host.querySelectorAll('.hs-r').forEach(function (el) { el.onclick = function () { goPage('p-smart'); onEnter('p-smart'); var c = $q('.sm-r[data-s="' + el.dataset.s + '"]'); if (c) c.scrollIntoView({ behavior: 'smooth', block: 'center' }); }; });
     }
     var o = $q('#hsOpen'); if (o) o.onclick = function () { goPage('p-smart'); onEnter('p-smart'); };
-    var g = $q('#hsGo'); if (g) g.onclick = function () { goPage('p-smart'); onEnter('p-smart'); run({ mode: 'fast' }); };
+    var g = $q('#hsGo'); if (g) g.onclick = function () { goPage('p-smart'); onEnter('p-smart'); run({ mode: 'sectors' }); };
   }
 
   function build() {
@@ -247,13 +327,15 @@
     var sec = document.createElement('section'); sec.className = 'page'; sec.id = 'p-smart';
     sec.innerHTML = '<div class="dp-card"><h3>סריקת מניות <small>שוק · אנליסטים · יסוד · טכני · נרות</small></h3>' +
       '<button class="btn sc-big" id="scGo">🔎 סרוק את השוק</button>' +
-      '<div class="dp-seg" id="scMode" style="margin-top:10px"><button data-m="fast">מהיר (~70)</button><button data-m="wide">רחב (~150)</button><button data-m="mine">הרשימות שלי</button><button data-m="custom">הדבק</button></div>' +
+      '<div class="dp-seg" id="scMode" style="margin-top:10px"><button data-m="sectors">5 מכל סקטור</button><button data-m="quick">מהיר (3)</button><button data-m="mine">הרשימות שלי</button><button data-m="custom">הדבק</button></div>' +
+      '<label id="scSpecW" class="sc-spec"><input type="checkbox" id="scSpec" checked> כולל 5 מניות ספקולטיביות עד $5 עם קטליזטור (מחפש ברשת)</label>' +
       '<div id="scCustomW" style="display:none"><textarea id="scTxt" class="sm-txt" rows="3" dir="ltr" placeholder="NVDA MU AMD   או   NASDAQ:NVDA NYSE:BA"></textarea></div>' +
       '<div class="dp-prog" id="scBar" style="display:none"><i></i></div><div class="sc-st"><span id="scStage"></span><span id="scMsg" class="dp-msg"></span></div>' +
       '<details class="ht-set"><summary>🔧 בדיקת חיבורים (אם הנתונים לא נמשכים)</summary><div style="margin-top:10px"><button class="btn ghost" id="scDiagGo">בדוק את המפתחות עכשיו</button><div id="scDiag" style="margin-top:10px"></div></div></details></div><div id="scOut"></div>';
     document.querySelector('main').appendChild(sec);
     document.querySelectorAll('#scMode button').forEach(function (b) { b.onclick = function () { ST.mode = b.dataset.m; paint(); }; });
     $q('#scGo').onclick = function () { if (ST.busy) { ST.stop = true; return; } if (ST.mode === 'custom') { var c = parseSyms($q('#scTxt').value); if (!c.length) return toast('הדבק לפחות סימול אחד'); run({ custom: c }); } else run({ mode: ST.mode }); };
+    $q('#scSpec').onchange = function () { ST.spec = this.checked; };
     $q('#scDiagGo').onclick = diagnose;
   }
   build();
@@ -264,5 +346,5 @@
   if (big && !document.getElementById('homeScan')) big.insertAdjacentHTML('afterend', '<h2 id="hsH">🔎 סריקת היום <small>הזדמנויות לכניסה</small></h2><div class="card" id="homeScan"></div>');
   var wait = setInterval(function () { if (typeof D !== 'undefined' && D) { clearInterval(wait); renderHome(); } }, 400);
   window.runScan = function (custom) { goPage('p-smart'); onEnter('p-smart'); var c = custom || []; if (c.length) { $q('#scTxt').value = c.join(' '); ST.mode = 'custom'; paint(); run({ custom: c }); } };
-  window.__scan = { parseSyms: parseSyms, s1row: s1row, shortlist: shortlist, composite: composite, technical: technical, ttShort: ttShort, run: run, state: ST, diagnose: diagnose, FAST: FAST, WIDE: WIDE };
+  window.__scan = { parseSyms: parseSyms, s1row: s1row, pickPerSector: pickPerSector, composite: composite, technical: technical, ttShort: ttShort, run: run, state: ST, diagnose: diagnose, SECTORS: SECTORS, spec: spec, mkPlan: mkPlan };
 })();
