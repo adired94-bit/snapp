@@ -312,9 +312,9 @@ body.demo header{margin-top:22px}
 .subtabs button.on{color:var(--ink);border-color:var(--btc);font-weight:700}
 @media(min-width:900px){main{max-width:960px;margin:0 auto}.chartbox{height:560px}}
 @media(min-width:1100px){
-  body:has(#p-today.on) main{max-width:none;padding:0 18px}
-  body:has(#p-today.on) header{padding:8px 18px 2px}
-  body:has(#p-today.on) .tape{display:none}
+  body:has(#p-morning.on) main,body:has(#p-today.on) main{max-width:none;padding:0 18px}
+  body:has(#p-morning.on) header,body:has(#p-today.on) header{padding:8px 18px 2px}
+  body:has(#p-morning.on) .tape,body:has(#p-today.on) .tape{display:none}
   .today3{grid-template-columns:minmax(300px,1.1fr) minmax(0,2.2fr) minmax(300px,1.1fr);gap:14px;align-items:start}
   .tcol h2,.today h2{margin:8px 2px 4px;font-size:15px}
   .today .mood{padding:10px 12px;margin:0 0 8px}.today .mood b{font-size:16px}.today .mood p,.today .mood ul{font-size:13px}
@@ -363,32 +363,65 @@ body.demo header{margin-top:22px}
 <main>
 <div class="tabs" id="subnav" style="display:none"></div>
 
-<!-- בוקר -->
+<!-- בוקר: דף הבית -->
 <section class="page on" id="p-morning">
-  <div class="today">
-    <div class="mood" id="mood"><b>טוען…</b></div>
+  <div class="tabs" id="homeJump"><button data-j="#mood">📊 היום</button><button data-j="#liveH">📺 טלוויזיה</button><button data-j="#colNews">📰 חדשות</button><button data-j="#anH">🔭 אנליסטים</button><button data-j="#idxH">📈 מדדים</button><button data-j="#ckH">✅ צ'ק ליסט</button></div>
+  <div class="today3">
+    <aside class="tcol" id="colNews">
+      <h2 style="margin-top:4px">חדשות <small id="todayNewsT"></small><button class="btn ghost small" id="tnRefresh">↻</button></h2>
+      <div class="tabs" id="tnTabs" style="margin:0 0 6px"></div>
+      <div class="card scrollcol" id="todayNews"></div>
+      <h2>מהעיתונות <small id="rssTime2"></small></h2>
+      <div class="card scrollcol" id="rss2" style="max-height:34vh"></div>
+    </aside>
+    <div class="today">
+      <div class="mood" id="mood"><b>טוען…</b></div>
       <div class="mood" id="eodBox" style="display:none"></div>
       <div class="big" id="bigCards" style="margin-top:10px"></div>
       
-    <h2>צ'ק ליסט יומי <small id="dailyCount"></small></h2>
+    
+      <h2 id="ckH">צ'ק ליסט יומי <small id="dailyCount"></small></h2>
   <div class="card"><div class="progress"><i id="dailyBar"></i></div><ul class="check" id="daily"></ul></div>
   
-    <h2>החוקים שלי היום</h2>
+    
+      <h2>החוקים שלי היום</h2>
       <div class="card" id="todayRules"></div>
       <h2>אירועים קרובים <small>7 ימים</small></h2>
       <div class="card" id="todayEvents"></div>
       
-    <h2>מדדים עכשיו</h2>
+    
+      <div class="qa"><button id="qaScan"><span>🔎</span>סורק</button><button id="qaChat"><span>💬</span>שאל</button><button id="qaWeekly"><span>📊</span>שבועי</button><button id="eodBtn"><span>🌙</span>סוף יום</button></div>
+    </div>
+    <aside class="tcol" id="colLeft">
+      <h2 id="liveH" style="margin-top:4px">📺 שידור חי</h2>
+      <div class="card">
+    <div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><div class="subtabs" style="margin:0;flex:1"><button data-live="tv10" class="on">ערוץ 10 – כלכלה</button><button data-live="bbg">Bloomberg</button><button data-live="yf">Yahoo</button><button data-live="off">כבוי</button></div></div>
+      <div id="liveBox" style="margin-top:8px;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:16/9;display:none"></div>
+      <div class="hint" style="margin-top:6px" id="liveHint">ערוץ 10 – ערוץ הכלכלה של ישראל, בעברית. Bloomberg 24/7 ו-Yahoo (שעות המסחר) באנגלית.</div>
+    </div>
+    <div class="script" id="radioScript"></div>
+  </div>
+      
+      <div id="lessonBox"></div>
+      <h2 id="anH">🔭 מידע מוקדם · אנליסטים <small id="anT"></small><button class="btn ghost small" id="anRefresh" title="חפש עכשיו ברשת">↻</button></h2>
+      <div class="tabs" id="anTabs" style="margin:0 0 6px"><button data-t="web" class="on">שינויי המלצות</button><button data-t="cons">קונצנזוס</button></div>
+      <div class="card scrollcol" id="anBox"><div class="empty">טוען…</div></div>
+      <h2 id="idxH">מדדים עכשיו</h2>
       <div class="card" id="idxBox" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:8px"></div>
       
-    <h2>הסורק היום <small id="scanMiniT"></small><button class="btn ghost small" id="scanMiniRun">סרוק</button></h2>
+    
+      <h2>קפיצות של 10%+ <small id="moversT">אוטומטי</small></h2>
+      <div class="card" id="moversBox" style="max-height:26vh;overflow-y:auto"><div class="empty">סורק את כל הרשימות כל 5 דק' בשעות המסחר. מניה שזזה ±10% נכנסת, ירדה מתחת – יוצאת.</div></div>
+      <h2>הסורק היום <small id="scanMiniT"></small><button class="btn ghost small" id="scanMiniRun">סרוק</button></h2>
       <div class="card" id="scanMini"></div>
       
-    <div id="lessonBox"></div>
-    <h2>פעילות אחרונה</h2>
+    
+      <h2>פעילות אחרונה</h2>
       <div class="card" id="recentBox" style="max-height:30vh;overflow-y:auto"></div>
     
-    <div class="qa"><button id="qaScan"><span>🔎</span>סורק</button><button id="qaChat"><span>💬</span>שאל</button><button id="qaWeekly"><span>📊</span>שבועי</button><button id="eodBtn"><span>🌙</span>סוף יום</button></div>
+    
+    </aside>
   </div>
 </section>
 
@@ -419,31 +452,12 @@ body.demo header{margin-top:22px}
 </section>
 
 <!-- שידור חי -->
-<section class="page" id="p-live">
-  <div class="today">
-    <h2 style="margin-top:4px">📺 שידור חי</h2>
-      <div class="card">
-    <div>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><div class="subtabs" style="margin:0;flex:1"><button data-live="tv10" class="on">ערוץ 10 – כלכלה</button><button data-live="bbg">Bloomberg</button><button data-live="yf">Yahoo</button><button data-live="off">כבוי</button></div></div>
-      <div id="liveBox" style="margin-top:8px;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:16/9;display:none"></div>
-      <div class="hint" style="margin-top:6px" id="liveHint">ערוץ 10 – ערוץ הכלכלה של ישראל, בעברית. Bloomberg 24/7 ו-Yahoo (שעות המסחר) באנגלית.</div>
-    </div>
-    <div class="script" id="radioScript"></div>
-  </div>
-      
-  </div>
-</section>
 
 <!-- סורק -->
 <section class="page" id="p-scan">
   <h2>סורק הזדמנויות <small id="scanT"></small><button class="btn small" id="scanRun">סרוק עכשיו</button></h2>
   <div class="hint" style="margin:0 4px 8px">עובר על כל המניות ברשימות שלך: תנועה חריגה, פריצה/שבירה של 20 יום, קרבה לתמיכה/התנגדות. מציג עד 6. לחיצה → ניתוח.</div>
   <div class="card" id="scanOut"><div class="empty">עוד לא נסרק היום.</div></div>
-  <div class="today">
-    <h2>קפיצות של 10%+ <small id="moversT">אוטומטי</small></h2>
-      <div class="card" id="moversBox" style="max-height:26vh;overflow-y:auto"><div class="empty">סורק את כל הרשימות כל 5 דק' בשעות המסחר. מניה שזזה ±10% נכנסת, ירדה מתחת – יוצאת.</div></div>
-      
-  </div>
 </section>
 
 <!-- סיכום שבועי -->
@@ -546,14 +560,6 @@ body.demo header{margin-top:22px}
   </div>
   <h2>מהעיתונות הכלכלית <small id="rssTime"></small></h2>
   <div class="card" id="rss"><div class="empty">טוען…</div></div>
-  <div class="today">
-    <h2 style="margin-top:4px">חדשות <small id="todayNewsT"></small><button class="btn ghost small" id="tnRefresh">↻</button></h2>
-      <div class="tabs" id="tnTabs" style="margin:0 0 6px"></div>
-      <div class="card scrollcol" id="todayNews"></div>
-      <h2>מהעיתונות <small id="rssTime2"></small></h2>
-      <div class="card scrollcol" id="rss2" style="max-height:34vh"></div>
-    
-  </div>
 </section>
 
 <!-- הגדרות -->
@@ -1060,7 +1066,7 @@ const GROUPS={
   scan:[['p-scan','סורק']],
   port:[['p-port','פוזיציות']],
   journal:[['p-journal','יומן ועסקאות'],['p-weekly','סיכום שבועי']],
-  news:[['p-news','חדשות'],['p-live','שידור חי']]
+  news:[['p-news','חדשות']]
 };
 const PAGE_GROUP={};Object.entries(GROUPS).forEach(([g,ps])=>ps.forEach(([id])=>PAGE_GROUP[id]=g));
 const lastSub={};let chartShown=false;
@@ -2011,6 +2017,7 @@ function renderAll(){renderMovers();renderRules();renderEvList();renderWatch();r
 </script>
 <script src="engine.js"></script>
 <script src="deep.js"></script>
+<script src="insights.js"></script>
 <script src="theme.js"></script>
 </body>
 </html>

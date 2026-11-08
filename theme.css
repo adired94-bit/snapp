@@ -217,3 +217,23 @@ section.page.on>.today>*:nth-child(n+6){animation-delay:.2s}
 @media(max-width:480px){.dp-mid{grid-template-columns:1fr}.dp-comp{grid-template-columns:112px 1fr}.dp-fv b{font-size:14px}.dp-kv{grid-template-columns:repeat(3,1fr)}}
 
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0s!important;transition-duration:.001ms!important}}
+
+/* ====================== דף הבית ====================== */
+#homeJump{position:sticky;top:62px;z-index:20;padding:8px 2px;margin:0 0 8px;background:linear-gradient(180deg,rgba(7,9,13,.92),rgba(7,9,13,.6));backdrop-filter:blur(10px)}
+@media(min-width:1100px){#homeJump{display:none}}
+.today3 .card,.tcol .card{padding:12px}
+#liveBox{border:1px solid var(--line);box-shadow:0 18px 40px -22px rgba(0,0,0,.9)}
+.ni{transition:background .2s,transform .2s var(--ease);border-radius:10px}.ni:hover{background:rgba(255,255,255,.025)}
+/* אנליסטים ומידע מוקדם */
+.an-i{padding:11px 4px;border-bottom:1px solid rgba(255,255,255,.05);animation:rise .5s var(--ease) both}.an-i:last-child{border-bottom:0}
+.an-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.an-top .tk{font-family:var(--mono);font-size:15px;font-weight:800;letter-spacing:-.3px}
+.an-top .when{margin-inline-start:auto;font-size:11.5px;color:var(--ink2)}
+.chip{padding:2px 9px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid var(--line);background:var(--panel2);color:var(--ink2);white-space:nowrap}
+.chip.up{color:var(--up);border-color:rgba(25,214,138,.4);background:rgba(25,214,138,.08)}.chip.down{color:var(--down);border-color:rgba(255,77,94,.4);background:rgba(255,77,94,.08)}
+.chip.blue{color:var(--blue);border-color:rgba(88,196,255,.4);background:rgba(88,196,255,.08)}.chip.warn{color:var(--btc);border-color:rgba(255,176,32,.4);background:rgba(255,176,32,.08)}
+.an-mv{margin-top:5px;font-size:13px;font-weight:700;direction:rtl}.an-mv em{font-style:normal;font-family:var(--mono);font-size:12px;margin-inline-start:6px}
+.an-i p{font-size:13px;line-height:1.5;margin-top:5px;color:var(--ink)}
+.an-i .why{margin-top:5px;font-size:12.5px;color:var(--ink2);border-inline-start:2px solid var(--btc);padding-inline-start:9px;line-height:1.45}
+.an-i a{display:inline-block;margin-top:6px;font-size:12px;font-weight:700;color:var(--blue);text-decoration:none}.an-i a:hover{text-decoration:underline}
+.an-bar{display:flex;height:7px;border-radius:99px;overflow:hidden;gap:2px;margin-top:8px}.an-bar i{display:block;min-width:0;border-radius:3px}
