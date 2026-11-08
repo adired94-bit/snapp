@@ -857,8 +857,8 @@ function loadChart(sym){curSym=sym;$('#chartSym').textContent=sym;renderWatch();
   const st=STUDIES.filter(([k])=>FIXED_ST.includes(k)||(S.studies||[]).includes(k)).map(x=>x[2]);
   tv('chart','embed-widget-advanced-chart.js',{autosize:true,symbol:tvSym(sym),interval:'D',timezone:'Asia/Jerusalem',theme:'dark',style:'1',locale:'he_IL',backgroundColor:'#171C26',gridColor:'rgba(42,49,64,.4)',hide_side_toolbar:false,allow_symbol_change:false,save_image:true,withdateranges:true,details:false,studies:st,support_host:'https://www.tradingview.com'})}
 const TAPE_INDICES=[
-  {proName:'FOREXCOM:SPXUSD',title:'S&P 500'},{proName:'FOREXCOM:NSXUSD',title:'נאסד"ק 100'},{proName:'NASDAQ:IXIC',title:'נאסד"ק קומפוזיט'},{proName:'FOREXCOM:DJI',title:'דאו ג\'ונס'},
-  {proName:'CAPITALCOM:RTY',title:'ראסל 2000'},{proName:'CAPITALCOM:VIX',title:'VIX מדד הפחד'},{proName:'NASDAQ:SOX',title:'שבבים SOX'},
+  {proName:'FOREXCOM:SPXUSD',title:'S&P 500'},{proName:'FOREXCOM:NSXUSD',title:'נאסד"ק 100'},{proName:'NASDAQ:ONEQ',title:'נאסד"ק קומפוזיט'},{proName:'FOREXCOM:DJI',title:'דאו ג\'ונס'},
+  {proName:'CAPITALCOM:RTY',title:'ראסל 2000'},{proName:'CAPITALCOM:VIX',title:'VIX מדד הפחד'},{proName:'NASDAQ:SMH',title:'שבבים'},
   {proName:'TASE:TA35',title:'ת"א 35'},{proName:'TASE:TA125',title:'ת"א 125'},{proName:'TASE:TA90',title:'ת"א 90'},{proName:'FX_IDC:USDILS',title:'דולר/שקל'},
   {proName:'TVC:DXY',title:'מדד הדולר'},{proName:'TVC:US10Y',title:'תשואה 10 שנים'},{proName:'TVC:GOLD',title:'זהב'},{proName:'TVC:USOIL',title:'נפט'},{proName:'BITSTAMP:BTCUSD',title:'ביטקוין'}];
 function loadTape(){const user=[...new Set(D.watch.filter(w=>w.tape).flatMap(w=>w.items))].filter(t=>t!=='BTC');
