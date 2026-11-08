@@ -161,6 +161,20 @@
   }
 
   /* ---------- בניית תוכנית ופירוק לאופק ---------- */
+  /* תוכנית עסקה לכיוון נתון: סטופ ויעדים לפי ATR של טווח הבסיס, כמות מהסיכון, תקרת גודל ומכשולים */
+  function mkPlan(base, mode, dir, sf, hyp) {
+    var lv = AT.levels(dir, base.price, base.atr, AT.MODES[mode].mult), entry = base.price, long = dir === 'long', risk = Math.abs(entry - lv.stop);
+    var riskUsd = (S.risk || 0) * sf.factor, qty = risk > 0 && riskUsd > 0 ? Math.floor(riskUsd / risk) : 0;
+    /* תקרת גודל: לא מציעים פוזיציה גדולה מהתיק (כפול המינוף המקסימלי שהגדרת, ברירת מחדל 1) */
+    var maxLev = +S.maxLev > 0 ? +S.maxLev : 1, capped = false;
+    if (S.acct > 0 && entry > 0) { var maxQ = Math.floor(S.acct * maxLev / entry); if (qty > maxQ) { qty = maxQ; capped = true; } }
+    /* מכשולים בדרך ליעד השני: רמות תמיכה והתנגדות שבין הכניסה ליעד */
+    var lo = Math.min(entry, lv.t2), hi = Math.max(entry, lv.t2);
+    var obst = (base.zones.sr || []).filter(function (z) { return z.level > lo && z.level < hi && (long ? z.type === 'resistance' : z.type === 'support'); });
+    return { dir: dir, side: long ? 'לונג' : 'שורט', entry: entry, zoneLo: entry - 0.25 * base.atr, zoneHi: entry + 0.25 * base.atr, stop: lv.stop, t1: lv.t1, t2: lv.t2, atr: base.atr, tf: E.BASE_TF[mode],
+      rr1: risk > 0 ? Math.abs(lv.t1 - entry) / risk : null, rr2: risk > 0 ? Math.abs(lv.t2 - entry) / risk : null, riskPerShare: risk, riskPct: risk / entry * 100,
+      qty: qty, riskUsd: qty * risk, posUsd: qty * entry, sizeFactor: sf, capped: capped, maxLev: maxLev, hypothetical: !!hyp, obstacles: obst.slice(0, 3), hold: HOLD[mode], trail: TRAIL[mode] };
+  }
   function buildMode(bars, mode, ctx) {
     var an = E.analyzeAll(bars, mode, 70);
     var base = an.results[E.BASE_TF[mode]];
@@ -177,22 +191,60 @@
         if (d * sg > 0) ex.pros.push('סימן במחיר: ' + n); else ex.risks.push('נגד התרחיש: ' + n);
       });
     }
-    var plan = null;
-    if (ex.plan && base && base.ok) {
-      var p = ex.plan, risk = Math.abs(p.entry - p.stop), long = p.dir === 'long';
-      var riskUsd = (S.risk || 0) * sf.factor, qty = risk > 0 && riskUsd > 0 ? Math.floor(riskUsd / risk) : 0;
-      /* תקרת גודל: לא מציעים פוזיציה גדולה מהתיק (כפול המינוף המקסימלי שהגדרת, ברירת מחדל 1) */
-      var maxLev = +S.maxLev > 0 ? +S.maxLev : 1, capped = false;
-      if (S.acct > 0 && p.entry > 0) { var maxQ = Math.floor(S.acct * maxLev / p.entry); if (qty > maxQ) { qty = maxQ; capped = true; } }
-      /* מכשולים בדרך ליעד השני: רמות תמיכה והתנגדות שבין הכניסה ליעד */
-      var lo = Math.min(p.entry, p.t2), hi = Math.max(p.entry, p.t2);
-      var obst = (base.zones.sr || []).filter(function (z) { return z.level > lo && z.level < hi && (long ? z.type === 'resistance' : z.type === 'support'); });
-      plan = { dir: p.dir, side: p.side, entry: p.entry, zoneLo: p.entry - 0.25 * base.atr, zoneHi: p.entry + 0.25 * base.atr, stop: p.stop, t1: p.t1, t2: p.t2, atr: base.atr, tf: p.tf,
-        rr1: risk > 0 ? Math.abs(p.t1 - p.entry) / risk : null, rr2: risk > 0 ? Math.abs(p.t2 - p.entry) / risk : null, riskPerShare: risk, riskPct: risk / p.entry * 100,
-        qty: qty, riskUsd: qty * risk, posUsd: qty * p.entry, sizeFactor: sf, capped: capped, maxLev: maxLev, hypothetical: p.hypothetical, obstacles: obst.slice(0, 3), hold: HOLD[mode], trail: TRAIL[mode] };
-    }
+    var plan = ex.plan && base && base.ok ? mkPlan(base, mode, ex.plan.dir, sf, ex.plan.hypothetical) : null;
     return { mode: mode, an: an, ex: ex, base: base, plan: plan, sf: sf };
   }
+  /* ---------- ציון כניסה משולב ----------
+     טכני + חדשות החברה + מאקרו + סקטור + פוליטיקה ורגולציה + אנליסטים + יסודות + מצב השוק.
+     כל רכיב מ-100- (שורט) עד 100+ (לונג). המשקלות תלויים באופק: ביומי הטכני והחדשות מובילים, בארוך היסודות והאנליסטים. */
+  var UW = {
+    day:   { tech: 0.45, company: 0.15, macro: 0.10, sector: 0.10, politics: 0.05, analysts: 0.05, fund: 0.05, regime: 0.05 },
+    swing: { tech: 0.30, company: 0.12, macro: 0.12, sector: 0.10, politics: 0.06, analysts: 0.12, fund: 0.12, regime: 0.06 },
+    long:  { tech: 0.20, company: 0.08, macro: 0.12, sector: 0.10, politics: 0.05, analysts: 0.15, fund: 0.24, regime: 0.06 } };
+  var UL = { tech: 'טכני', company: 'חדשות החברה', macro: 'מאקרו', sector: 'הסקטור', politics: 'פוליטיקה ורגולציה', analysts: 'אנליסטים', fund: 'יסודות החברה', regime: 'מצב השוק' };
+  var ENTRY = 40, LEAN = 18, GATE_OLD = 'ציון מאוחד עבר סף כניסה ללא ווטו', GATE_NEW = 'הציון המשולב מספיק חזק';
+  var cv = function (x) { return Math.max(-100, Math.min(100, x)); };
+  function uniParts(res, m, k) {
+    var W = UW[k], P = [], ai = res.ctx && res.ctx.ai && !res.ctx.ai.err ? res.ctx.ai : null, sc = (ai && ai.scores) || {};
+    var add = function (key, v, detail) { if (v == null || !isFinite(v)) return; P.push({ k: key, label: UL[key], w: W[key], v: Math.round(cv(v)), detail: detail || '' }); };
+    add('tech', m.ex.score, m.ex.headline);
+    ['company', 'macro', 'sector', 'politics'].forEach(function (c) { if (ai && sc[c] != null) add(c, sc[c] * 50, ai[c] && ai[c][0] ? ai[c][0].point : ''); });
+    var rec = res.fund && res.fund.rec, share = null;
+    if (rec) { var tot = (rec.strongBuy || 0) + (rec.buy || 0) + (rec.hold || 0) + (rec.sell || 0) + (rec.strongSell || 0); if (tot) share = ((rec.strongBuy || 0) + (rec.buy || 0)) / tot; }
+    var av = []; if (share != null) av.push((share - 0.5) * 200); if (ai && sc.analysts != null) av.push(sc.analysts * 50);
+    if (av.length) add('analysts', av.reduce(function (a, b) { return a + b; }, 0) / av.length, (share != null ? Math.round(share * 100) + '% ממליצים לקנות' : '') + (ai && ai.analysts && ai.analysts[0] ? (share != null ? ' · ' : '') + ai.analysts[0].point : ''));
+    if (res.fs && res.fs.score != null) add('fund', (res.fs.score - 50) * 2, 'ציון יסוד ' + res.fs.score + ' מתוך 100');
+    if (res.regime) add('regime', res.regime.state === 'on' ? 60 : res.regime.state === 'off' ? -60 : 0, res.regime.label);
+    return P;
+  }
+  function uniFor(res, m, k) {
+    var P = uniParts(res, m, k), sw = 0, sv = 0; P.forEach(function (p) { sw += p.w; sv += p.w * p.v; });
+    var S0 = sw ? sv / sw : 0, dir = S0 >= 0 ? 'long' : 'short', sg = S0 >= 0 ? 1 : -1, agreeW = 0;
+    P.forEach(function (p) { if (p.v * sg >= 15) agreeW += p.w; });
+    var agree = sw ? agreeW / sw : 0, tech = P.filter(function (p) { return p.k === 'tech'; })[0], nw = 0, nv = 0;
+    P.forEach(function (p) { if (['company', 'macro', 'sector', 'politics'].indexOf(p.k) >= 0) { nw += p.w; nv += p.w * p.v; } });
+    var ctxV = nw ? nv / nw : null, conflict = !!(tech && ctxV != null && tech.v * ctxV < 0 && Math.abs(tech.v) >= 30 && Math.abs(ctxV) >= 30);
+    var vet = m.an.combined.vetoes.length > 0, side = dir === 'long' ? 'לונג' : 'שורט', loading = !!(res.ctx && res.ctx.status === 'loading'), hasCtx = !!(res.ctx && res.ctx.ai && !res.ctx.ai.err);
+    var stance = 'flat', headline;
+    if (Math.abs(S0) >= ENTRY && agree >= 0.6 && !conflict && sw >= 0.8 && !vet && !loading) { stance = dir; headline = 'כניסה ל' + side + ': רוב הרכיבים מצביעים לאותו כיוון'; }
+    else if (Math.abs(S0) >= LEAN) {
+      stance = 'lean_' + dir;
+      headline = 'נטייה ל' + side + ', אבל ' + (loading ? 'עדיין מחפשים חדשות ומאקרו' : conflict ? 'יש סתירה בין הניתוח הטכני לחדשות והמאקרו' : vet ? 'טווח זמן גבוה מתנגד' : agree < 0.6 ? 'לא מספיק רכיבים מסכימים' : sw < 0.8 ? 'חסר מידע (' + (hasCtx ? 'יסודות ואנליסטים' : 'חדשות ומאקרו') + ')' : 'הציון עוד לא מספיק חזק לכניסה');
+    } else headline = loading ? 'עדיין מחפשים חדשות ומאקרו' : 'אין כיוון ברור: להמתין';
+    return { score: Math.round(S0), entry: Math.round(Math.abs(S0)), dir: dir, stance: stance, headline: headline, parts: P, agree: agree, agreeN: P.filter(function (p) { return p.v * sg >= 15; }).length, n: P.length, coverage: sw, conflict: conflict, loading: loading };
+  }
+  function unify(res) {
+    ['day', 'swing', 'long'].forEach(function (k) {
+      var m = res.modes[k]; m.uni = uniFor(res, m, k); var u = m.uni;
+      if (m.base && m.base.ok) { if (!m.plan || m.plan.dir !== u.dir) m.plan = mkPlan(m.base, k, u.dir, m.sf, true); m.plan.hypothetical = !(u.stance === 'long' || u.stance === 'short'); }
+      var g = m.gates.items.filter(function (x) { return x.label === GATE_OLD || x.label === GATE_NEW; })[0];
+      if (g) { g.label = GATE_NEW; g.ok = u.stance === 'long' || u.stance === 'short'; g.detail = 'ציון ' + u.entry + ' (נדרש ' + ENTRY + ')'; }
+      var it = m.gates.items; m.gates.failed = it.filter(function (x) { return x.ok === false; }).length; m.gates.unknown = it.filter(function (x) { return x.ok === null; }).length;
+      m.gates.ok = !m.gates.failed && !m.gates.unknown; m.gates.status = m.gates.failed ? 'blocked' : m.gates.unknown ? 'unverified' : 'ready';
+    });
+  }
+  /* תצוגת הכרעה: משולבת אם יש, אחרת טכנית */
+  function verdictOf(m) { var u = m.uni; return u ? { stance: u.stance, score: u.score, entry: u.entry, headline: u.headline } : { stance: m.ex.stance, score: m.ex.score, entry: Math.abs(m.ex.score), headline: m.ex.headline }; }
   function nearestZoneAtr(base) {
     if (!base || !base.ok) return null;
     var best = null, price = base.price;
@@ -267,6 +319,7 @@
       var res = { sym: sym, bars: bars, errors: errors, news: news, earn: earn, days: days, fund: fund, fs: fundScore(fund, price), quote: quote, price: price, modes: {}, at: Date.now(), ai: {} };
       res.spy = spy; res.regime = regimeOf(spy); res.tt = trendTemplate(bars['1D'], spy); res.day = dayLevels(bars['5m']); res.orb = orbPlan(res.day); res.q = quality(fund);
       ['day', 'swing', 'long'].forEach(function (m) { var r = buildMode(bars, m, { news: news, days: days }); r.gates = gatesFor(res, r, bars); res.modes[m] = r; });
+      unify(res);
       try { if (bars['1D'] && bars['1D'].length >= 140) res.bt = E.backtest(bars['1D'], { window: 120, start: 90, horizon: 20, mult: 1.5, rr: 2, cooldown: 3 }); } catch (e) { res.bt = null; }
       DEEP.res = res; setMsg(''); if (window.DeepCtx) DeepCtx.start(res);
     }).catch(function (e) { DEEP.res = null; setMsg('שגיאה: ' + e.message); })
@@ -316,24 +369,32 @@
   function bar(v) { var p = Math.round(Math.abs(v) * 50); return '<div class="dp-bar"><i class="' + (v >= 0 ? 'pos' : 'neg') + '" style="' + (v >= 0 ? 'right:50%;' : 'left:50%;') + 'width:' + p + '%"></i></div>'; }
 
   function heroHtml(r, m) {
-    var ex = m.ex, st = STANCE[ex.stance] || STANCE.flat, side = ex.stance.indexOf('long') >= 0 ? 'long' : ex.stance.indexOf('short') >= 0 ? 'short' : 'flat';
+    var V = verdictOf(m), st = STANCE[V.stance] || STANCE.flat, side = V.stance.indexOf('long') >= 0 ? 'long' : V.stance.indexOf('short') >= 0 ? 'short' : 'flat';
     var q = r.quote, chg = q && q.changePct != null ? q.changePct : null, c = cap(r.fund && r.fund.profile ? r.fund.profile.marketCapitalization : null);
-    var conf = Math.abs(ex.score) >= 70 ? 'חזק' : Math.abs(ex.score) >= 40 ? 'בינוני' : Math.abs(ex.score) >= 15 ? 'חלש' : 'ניטרלי';
+    var conf = V.entry >= 55 ? 'חזק' : V.entry >= 40 ? 'בינוני' : V.entry >= 18 ? 'חלש' : 'ניטרלי';
     var chips = ['day', 'swing', 'long'].map(function (k) {
-      var x = r.modes[k], s = x.ex.stance, t = (STANCE[s] || STANCE.flat)[1], cl = s.indexOf('long') >= 0 ? 'long' : s.indexOf('short') >= 0 ? 'short' : 'flat';
-      return '<button class="dp-chip ' + cl + (k === DEEP.mode ? ' on' : '') + '" data-mode="' + k + '"><small>' + MODES[k] + '</small><b>' + t + '</b><em>' + x.ex.score + '</em></button>';
+      var x = verdictOf(r.modes[k]), s = x.stance, t = (STANCE[s] || STANCE.flat)[1], cl = s.indexOf('long') >= 0 ? 'long' : s.indexOf('short') >= 0 ? 'short' : 'flat';
+      return '<button class="dp-chip ' + cl + (k === DEEP.mode ? ' on' : '') + '" data-mode="' + k + '"><small>' + MODES[k] + '</small><b>' + t + '</b><em>' + x.entry + '</em></button>';
     }).join('');
+    var u = m.uni, sub = u ? '<small>' + u.agreeN + ' מתוך ' + u.n + ' רכיבים מצביעים ל' + (u.dir === 'long' ? 'לונג' : 'שורט') + (u.loading ? ' · מעדכן עם חדשות ומאקרו…' : '') + '</small>' : '';
     return '<section class="dp-hero ' + side + '">' +
       '<div class="dp-top"><div class="dp-id"><b class="dp-sym">' + esc(r.sym) + '</b><span>' + esc((r.fund && r.fund.profile && r.fund.profile.name) || '') + (r.fund && r.fund.profile && r.fund.profile.finnhubIndustry ? ' · ' + esc(r.fund.profile.finnhubIndustry) : '') + '</span>' +
       (c.cls ? '<em class="dp-cap">' + c.cls + ' · ' + c.txt + '</em>' : '') + '</div>' +
       '<div class="dp-px"><b>$' + px(r.price) + '</b>' + (chg != null ? '<span class="' + (chg >= 0 ? 'up' : 'down') + '">' + (chg >= 0 ? '+' : '') + num(chg, 2) + '%</span>' : '') + '</div></div>' +
-      '<div class="dp-mid">' + gauge(ex.score) + '<div class="dp-verdict"><div class="dp-stance">' + st[0] + '</div><div class="dp-conf">' + MODES[m.mode] + ' · ' + conf + '</div><p>' + esc(ex.headline) + '</p>' +
-      (ex.confirm ? '<small>' + esc(ex.confirm) + '</small>' : '') + '</div></div>' +
+      '<div class="dp-mid">' + gauge(V.score) + '<div class="dp-verdict"><div class="dp-stance">' + st[0] + '</div><div class="dp-conf">' + MODES[m.mode] + ' · ' + conf + ' · ציון כניסה ' + V.entry + '</div><p>' + esc(V.headline) + '</p>' + sub +
+      (m.ex.confirm && !u ? '<small>' + esc(m.ex.confirm) + '</small>' : '') + '</div></div>' +
       '<div class="dp-chips">' + chips + '</div></section>';
+  }
+  function uniHtml(m) {
+    var u = m.uni; if (!u) return '';
+    var rows = u.parts.map(function (p) { return '<div class="dp-comp"><span>' + p.label + ' <small>' + Math.round(p.w * 100) + '%</small></span>' + bar(p.v / 100) + '<em>' + (p.v >= 0 ? '+' : '') + p.v + (p.detail ? ' · ' + esc(String(p.detail).slice(0, 110)) : '') + '</em></div>'; }).join('');
+    var missing = Object.keys(UL).filter(function (k) { return !u.parts.some(function (p) { return p.k === k; }); }).map(function (k) { return UL[k]; });
+    return '<section class="dp-card"><h3>ממה מורכב ציון הכניסה <small>' + u.agreeN + ' מתוך ' + u.n + ' מסכימים</small></h3>' + (u.conflict ? '<div class="dp-flag warn">יש סתירה: הניתוח הטכני והחדשות והמאקרו מצביעים לכיוונים הפוכים. בדרך כלל ממתינים.</div>' : '') + rows +
+      (missing.length ? '<div class="dp-foot" style="text-align:right;margin-top:8px">לא נכלל (אין נתון): ' + esc(missing.join(', ')) + '. המשקל מתחלק מחדש בין הרכיבים הקיימים.</div>' : '') + '</section>';
   }
   function planHtml(r, m) {
     var p = m.plan;
-    if (!p) return '<section class="dp-card"><h3>תוכנית עסקה</h3><div class="dp-empty">הציון ניטרלי (' + m.ex.score + '). אין כיוון מספיק ברור לתוכנית. מחכים לאישור.</div></section>';
+    if (!p) return '<section class="dp-card"><h3>תוכנית עסקה</h3><div class="dp-empty">הציון המשולב ניטרלי (' + verdictOf(m).score + '). אין כיוון מספיק ברור לתוכנית. מחכים לאישור.</div></section>';
     var long = p.dir === 'long', cls = long ? 'long' : 'short';
     var hyp = p.hypothetical ? '<div class="dp-flag">תרחיש מותנה: התנאים לכניסה עוד לא התקיימו. זה מה שיקרה אם יתקיימו.</div>' : '';
     var capNote = p.capped ? '<div class="dp-flag">הכמות הוגבלה לגודל התיק (מינוף מקסימלי ' + p.maxLev + 'x). הסטופ צפוף, ולכן הסיכון בפועל נמוך מהסיכון שהגדרת. אפשר לשנות מינוף בחום תיק › הגדרת תקרות.</div>' : '';
@@ -369,7 +430,7 @@
       return '<div class="dp-comp"><span>' + COMP_NAME[k] + ' <small>' + E.COMP_W[k] + '</small></span>' + bar(v) + '<em>' + why + '</em></div>';
     }).join('');
     var pats = (b.patterns || []).map(function (p) { return '<span class="dp-pat ' + p.dir + '">' + esc(p.name) + '</span>'; }).join('');
-    return '<section class="dp-card"><h3>ממה מורכב הציון <small>טווח בסיס ' + E.TF_LABEL[E.BASE_TF[m.mode]] + '</small></h3>' + rows +
+    return '<section class="dp-card"><h3>פירוט הניתוח הטכני <small>טווח בסיס ' + E.TF_LABEL[E.BASE_TF[m.mode]] + '</small></h3>' + rows +
       (pats ? '<div class="dp-pats"><b>תבניות נרות כרגע:</b> ' + pats + '</div>' : '') +
       '<div class="dp-kv">' + [['RSI', b.rsi != null ? Math.round(b.rsi) : '–'], ['נפח יחסי', b.rvol != null ? 'x' + num(b.rvol, 2) : '–'], ['VWAP', b.vwap != null ? '$' + px(b.vwap) : '–'], ['POC', b.poc != null ? '$' + px(b.poc) : '–'], ['שוק', b.state === 'trend_up' ? 'מגמת עלייה' : b.state === 'trend_down' ? 'מגמת ירידה' : 'טווח']].map(function (x) { return '<div><span>' + x[0] + '</span><b>' + x[1] + '</b></div>'; }).join('') + '</div></section>';
   }
@@ -465,7 +526,7 @@
     var r = DEEP.res;
     if (!r) { host.innerHTML = DEEP.busy ? '<div class="dp-skel"><i></i><i></i><i></i></div>' : ''; return; }
     var m = r.modes[DEEP.mode];
-    host.innerHTML = heroHtml(r, m) + regimeHtml(r) + planHtml(r, m) + gatesHtml(m) + (window.DeepCtx ? DeepCtx.html(r) : '') + (DEEP.mode === 'day' ? dayHtml(r) : trendHtml(r) + (DEEP.mode === 'long' ? qualityHtml(r) : '')) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m) +
+    host.innerHTML = heroHtml(r, m) + regimeHtml(r) + uniHtml(m) + planHtml(r, m) + gatesHtml(m) + (window.DeepCtx ? DeepCtx.html(r) : '') + (DEEP.mode === 'day' ? dayHtml(r) : trendHtml(r) + (DEEP.mode === 'long' ? qualityHtml(r) : '')) + prosRisksHtml(m) + mtfHtml(m) + btHtml(r) + compHtml(m) + levelsHtml(m) + fundHtml(r) + newsHtml(r) + aiHtml(r, m) +
       '<div class="dp-foot">נוצר ' + new Date(r.at).toLocaleTimeString('he-IL') + '. כלי עזר אישי ולא ייעוץ השקעות. כל החלטה וכל הוראה באחריותך.</div>';
     $q('#dpOut').querySelectorAll('.dp-card,.dp-hero').forEach(function (el, i) { el.style.animationDelay = (i * 55) + 'ms'; });
     host.querySelectorAll('.dp-chip').forEach(function (b) { b.onclick = function () { DEEP.mode = b.dataset.mode; paint(); }; });
@@ -484,7 +545,7 @@
   /* ---------- פעולות ---------- */
   function planText(r, m) {
     var p = m.plan; if (!p) return '';
-    return r.sym + ' · ' + MODES[m.mode] + ' · ' + p.side + '\nכניסה $' + px(p.entry) + '\nסטופ $' + px(p.stop) + '\nיעד 1 $' + px(p.t1) + ' (2R)\nיעד 2 $' + px(p.t2) + ' (3R)\nכמות ' + p.qty + ' · סיכון $' + num(p.riskUsd, 0) + '\nציון ' + m.ex.score + '. ' + m.ex.headline;
+    return r.sym + ' · ' + MODES[m.mode] + ' · ' + p.side + '\nכניסה $' + px(p.entry) + '\nסטופ $' + px(p.stop) + '\nיעד 1 $' + px(p.t1) + ' (2R)\nיעד 2 $' + px(p.t2) + ' (3R)\nכמות ' + p.qty + ' · סיכון $' + num(p.riskUsd, 0) + '\nציון כניסה ' + verdictOf(m).entry + '. ' + verdictOf(m).headline;
   }
   function copyPlan(r, m) { var t = planText(r, m); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(function () { toast('התוכנית הועתקה'); }).catch(function () { toast('לא ניתן להעתיק'); }); }
   async function saveTrade(r, m) {
@@ -492,7 +553,7 @@
     if (!p.qty) return toast('הכמות 0. הגדר סיכון $ בהגדרות או הדק סטופ');
     var tk = r.sym.replace('/USD', ''), dir = p.dir, why = m.ex.pros.slice(0, 4);
     var tr = { id: 't' + Date.now(), mode: MODE, ticker: tk, dir: dir, status: 'planned', created: Date.now(), horizon: m.mode,
-      plan: { entry: p.entry, stop: p.stop, tp: [p.t1, p.t2], condition: m.ex.headline, reasons: why, pattern: m.ex.headline, bias: m.ex.stance, invalidation: (dir === 'long' ? 'סגירה מתחת ל-' : 'סגירה מעל ') + px(p.stop), analysts: null, news_context: r.news ? r.news.label : null },
+      plan: { entry: p.entry, stop: p.stop, tp: [p.t1, p.t2], condition: verdictOf(m).headline, reasons: why, pattern: verdictOf(m).headline, bias: m.ex.stance, invalidation: (dir === 'long' ? 'סגירה מתחת ל-' : 'סגירה מעל ') + px(p.stop), analysts: null, news_context: r.news ? r.news.label : null },
       sizing: { entry: p.entry, stop: p.stop, qty: p.qty, risk: Math.round(p.riskUsd), riskPct: S.acct > 0 ? p.riskUsd / S.acct * 100 : 0, pos: Math.round(p.posUsd) }, imgs: { chart: null }, qty: p.qty, entryPrice: null,
       log: [{ t: Date.now(), type: 'ניתוח מלא', note: planText(r, m) }] };
     D.trades.push(tr);
@@ -503,7 +564,7 @@
   }
   async function aiSummary(r, m) {
     var b = $q('#dpAi'); if (b) { b.disabled = true; b.textContent = 'מסכם…'; }
-    var data = { symbol: r.sym, horizon: MODES[m.mode], score: m.ex.score, stance: m.ex.stance, headline: m.ex.headline, plan: m.plan && { side: m.plan.side, entry: m.plan.entry, stop: m.plan.stop, tp1: m.plan.t1, tp2: m.plan.t2, rr1: m.plan.rr1, qty: m.plan.qty, hypothetical: m.plan.hypothetical },
+    var data = { symbol: r.sym, horizon: MODES[m.mode], score: verdictOf(m).entry, stance: verdictOf(m).stance, headline: verdictOf(m).headline, unified: m.uni && m.uni.parts.map(function (p) { return { part: p.label, value: p.v, weight: p.w }; }), plan: m.plan && { side: m.plan.side, entry: m.plan.entry, stop: m.plan.stop, tp1: m.plan.t1, tp2: m.plan.t2, rr1: m.plan.rr1, qty: m.plan.qty, hypothetical: m.plan.hypothetical },
       pros: m.ex.pros, risks: m.ex.risks, gates: m.gates.items.map(function (x) { return { label: x.label, ok: x.ok }; }), fundamentals: r.fs && { score: r.fs.score, notes: r.fs.notes.map(function (n) { return n.t; }) }, daysToEarnings: r.days, newsMood: r.news && r.news.label, context: r.ctx && r.ctx.ai && !r.ctx.ai.err ? { bias: r.ctx.ai.bias, reason: r.ctx.ai.bias_reason, macro: (r.ctx.ai.macro || []).map(function (x) { return x.point; }), sector: (r.ctx.ai.sector || []).map(function (x) { return x.point; }), company: (r.ctx.ai.company || []).map(function (x) { return x.point; }), analysts: (r.ctx.ai.analysts || []).map(function (x) { return x.point; }), events: (r.ctx.ai.events || []).map(function (x) { return x.point; }) } : null };
     try {
       var out = await claude([{ role: 'user', content: 'נתוני הניתוח (JSON):\n' + JSON.stringify(data) }], { tier: 'cheap', max_tokens: 700,
@@ -546,5 +607,5 @@
   var snap = document.getElementById('snap');
   if (snap && !document.getElementById('deepBtn')) { var b = document.createElement('button'); b.className = 'btn small'; b.id = 'deepBtn'; b.textContent = 'ניתוח'; b.onclick = function () { openDeep(curSym === 'BTC' ? 'BTC/USD' : curSym); }; snap.parentNode.insertBefore(b, snap); }
   build();
-  window.__deep = { repaint: function () { paint(); }, getClient: client, trendTemplate: trendTemplate, regimeOf: regimeOf, dayLevels: dayLevels, orbPlan: orbPlan, quality: quality, E: E, buildMode: buildMode, fundScore: fundScore, state: DEEP, run: run };
+  window.__deep = { unify: unify, mkPlan: mkPlan, uniFor: uniFor, verdictOf: verdictOf, repaint: function () { paint(); }, getClient: client, trendTemplate: trendTemplate, regimeOf: regimeOf, dayLevels: dayLevels, orbPlan: orbPlan, quality: quality, E: E, buildMode: buildMode, fundScore: fundScore, state: DEEP, run: run };
 })();
