@@ -23,7 +23,7 @@ header{padding:16px 16px 6px;display:flex;align-items:flex-start;justify-content
 header h1{font-size:24px;font-weight:900;letter-spacing:-.5px}
 header h1 span{color:var(--btc)}
 header .hs{text-align:left;font-size:12px;color:var(--ink2);line-height:1.3}
-.tape{margin:4px 0;min-height:46px;overflow:hidden}
+.tape{margin:4px 0;height:78px}.tape.idxbar{height:104px;margin:0 0 6px}
 main{padding:0 12px}
 section.page{display:none;padding-top:8px}section.page.on{display:block}
 h2{font-size:18px;font-weight:700;margin:14px 4px 8px;display:flex;align-items:center;gap:10px;justify-content:space-between}
@@ -353,7 +353,7 @@ body.demo header{margin-top:22px}
   <h1>יומן <span>המסחר</span> <small style="font-size:11px;color:var(--ink2);font-weight:400">v14.5</small><span class="modesw" id="modeSw"><button data-mode="live" class="on">אמיתי</button><button data-mode="demo">דמו</button></span></h1>
   <div style="display:flex;align-items:flex-start;gap:8px"><button class="btn ghost small" id="gearBtn" title="הגדרות (מפתחות, חוקים, התראות)">⚙️</button><div class="hs"><time id="today"></time><br><span id="sync"></span> · <span id="mon">מוניטור כבוי</span><span id="ibkrHead"></span></div></div>
 </header>
-<div class="tape"><div id="tape"></div></div>
+<div class="tape"><div id="tape"></div></div><div class="tape idxbar"><div id="idx"></div></div>
 <main>
 <div class="tabs" id="subnav" style="display:none"></div>
 
@@ -859,8 +859,10 @@ const TAPE_INDICES=[
   {proName:'CAPITALCOM:RTY',title:'ראסל 2000'},{proName:'CAPITALCOM:VIX',title:'VIX מדד הפחד'},{proName:'NASDAQ:SOX',title:'שבבים SOX'},
   {proName:'TASE:TA35',title:'ת"א 35'},{proName:'TASE:TA125',title:'ת"א 125'},{proName:'TASE:TA90',title:'ת"א 90'},{proName:'FX_IDC:USDILS',title:'דולר/שקל'},
   {proName:'TVC:DXY',title:'מדד הדולר'},{proName:'TVC:US10Y',title:'תשואה 10 שנים'},{proName:'TVC:GOLD',title:'זהב'},{proName:'TVC:USOIL',title:'נפט'},{proName:'BITSTAMP:BTCUSD',title:'ביטקוין'}];
-function loadTape(){const syms=[...new Set(D.watch.filter(w=>w.tape).flatMap(w=>w.items))].filter(t=>t!=='BTC');
-  tv('tape','embed-widget-ticker-tape.js',{symbols:TAPE_INDICES.concat(syms.map(t=>({proName:tvSym(t),title:t}))),showSymbolLogo:false,colorTheme:'dark',isTransparent:true,displayMode:'adaptive',locale:'he_IL'})}
+function loadTape(){const user=[...new Set(D.watch.filter(w=>w.tape).flatMap(w=>w.items))].filter(t=>t!=='BTC');
+  const hot=window.__hot?window.__hot.list():['NVDA','TSLA','AAPL','AMD','PLTR','MSTR','COIN','META'];const syms=[...new Set(hot.concat(user))];
+  tv('tape','embed-widget-ticker-tape.js',{symbols:syms.map(t=>({proName:tvSym(t),title:t})),showSymbolLogo:false,colorTheme:'dark',isTransparent:true,displayMode:'adaptive',locale:'he_IL'});
+  tv('idx','embed-widget-tickers.js',{symbols:TAPE_INDICES.map(x=>({proName:x.proName,title:x.title})),colorTheme:'dark',isTransparent:true,showSymbolLogo:false,locale:'he_IL'})}
 
 /* ================= מחירים ================= */
 const LIVE={};
@@ -1988,7 +1990,7 @@ function renderAll(){renderMovers();renderRules();renderEvList();renderWatch();r
 <script src="heat.js"></script>
 <script src="sync.js"></script>
 <script src="market.js"></script>
-<script src="scan.js"></script>
+<script src="scan.js"></script><script src="hot.js"></script>
 <script src="theme.js"></script>
 </body>
 </html>
