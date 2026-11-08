@@ -558,8 +558,8 @@ body.demo header{margin-top:22px}
     <h2 style="margin:16px 0 6px">📈 מחירים</h2>
     <label>מפתח Finnhub (מחירים חיים לרשימת המעקב ולמוניטור – 60 קריאות בדקה, חינם)</label><input id="sFh" placeholder="finnhub api key">
     <div class="hint">finnhub.io → Get free API key. זה המקור הראשי למחירים.</div>
-    <label>סיסמת סנכרון (מסנכרנת את המפתחות לכל מכשיר. המפתחות מוצפנים, והסיסמה לא נשלחת לשום מקום)</label><input id="sVp" type="password" placeholder="לפחות 12 תווים" autocomplete="new-password">
-    <div class="hint">מכשיר חדש יבקש רק את הסיסמה הזו, פעם אחת, במקום שלושה מפתחות. סיסמה חלשה מחלישה את ההצפנה, אז בחר ארוכה.</div>
+    <label>קוד סנכרון (מסנכרן את המפתחות לכל מכשיר. המפתחות מוצפנים, והקוד לא נשלח לשום מקום)</label><input id="sVp" type="text" placeholder="קוד קצר, לפחות 6 תווים" autocomplete="off">
+    <div class="hint">מכשיר חדש יבקש רק את הקוד הזה, פעם אחת, במקום שלושה מפתחות. מומלץ 8 תווים ומעלה (אותיות ומספרים), כי קוד קצר מאוד קל יותר לפיצוח.</div>
     <label>מפתח Twelve Data (נרות היסטוריים לניתוח הטכני)</label><input id="sTd" placeholder="twelvedata api key">
     <div class="hint">twelvedata.com → API Keys. משמש רק לניתוח (8 קריאות בדקה בחינם – לא מספיק לרשימת מעקב).</div>
     <h2 style="margin:16px 0 6px">🔔 התראות</h2>
@@ -650,12 +650,13 @@ if(!S.provFix){S.provider='auto';S.provFix=1;try{localStorage.setItem(SKEY,JSON.
 function saveS(){try{localStorage.setItem(SKEY,JSON.stringify(S))}catch(e){}}
 /* ===== כספת מפתחות מוצפנת (AES-GCM + PBKDF2) – מסונכרנת בין מכשירים דרך Supabase =====
    המפתחות מוצפנים בדפדפן לפני השליחה. בענן נשמר רק מידע מוצפן; הסיסמה נשארת רק במכשירים שלך. */
+const VAULT_IT=600000;
 const VAULT_FIELDS=['anth','gem','td','fh','tgT','tgC'];
 const b64=u=>btoa(String.fromCharCode(...new Uint8Array(u)));
 const unb64=t=>Uint8Array.from(atob(t),c=>c.charCodeAt(0));
-async function vKey(pass,salt){const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:250000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
-async function vaultSeal(pass){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));const o={};VAULT_FIELDS.forEach(f=>{if(S[f])o[f]=S[f]});const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},await vKey(pass,salt),new TextEncoder().encode(JSON.stringify(o)));return{v:1,salt:b64(salt),iv:b64(iv),ct:b64(ct),at:Date.now()}}
-async function vaultOpen(v,pass){const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(v.iv)},await vKey(pass,unb64(v.salt)),unb64(v.ct));return JSON.parse(new TextDecoder().decode(pt))}
+async function vKey(pass,salt,it){const km=await crypto.subtle.importKey('raw',new TextEncoder().encode(pass),'PBKDF2',false,['deriveKey']);return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:it||250000,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function vaultSeal(pass){const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));const o={};VAULT_FIELDS.forEach(f=>{if(S[f])o[f]=S[f]});const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},await vKey(pass,salt,VAULT_IT),new TextEncoder().encode(JSON.stringify(o)));return{v:1,it:VAULT_IT,salt:b64(salt),iv:b64(iv),ct:b64(ct),at:Date.now()}}
+async function vaultOpen(v,pass){const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(v.iv)},await vKey(pass,unb64(v.salt),v.it),unb64(v.ct));return JSON.parse(new TextDecoder().decode(pt))}
 async function vaultSync(){if(!S.vp||!D||!SB)return;try{D.vault=await vaultSeal(S.vp);await save();toast('המפתחות מסונכרנים בין המכשירים')}catch(e){console.warn('vault sync failed',e);toast('סנכרון המפתחות נכשל')}}
 
 /* ================= ברירת מחדל ================= */
@@ -1878,7 +1879,7 @@ async function loadRSS(){
 function loadSettingsUI(){$('#sAnth').value=S.anth;$('#sGem').value=S.gem||'';$('#sGemModel').value=S.gemModel||'gemini-3.6-flash';$('#sProv').value=S.provider||'auto';$('#sEco').checked=S.eco!==false;$('#usage').textContent=usageText();$('#sTd').value=S.td;$('#sFh').value=S.fh||'';$('#sVp').value=S.vp||'';$('#sTgT').value=S.tgT;$('#sTgC').value=S.tgC;$('#sRisk').value=S.risk;$('#sAcct').value=S.acct||'';$('#sNewsMin').value=S.newsMin||30;$('#sMon').checked=S.mon;$('#sAuto').checked=!!S.auto;$('#sIbkr').checked=!!S.ibkr;$('#szRisk').value=S.risk}
 function fillVoices(){const vs=speechSynthesis.getVoices();const he=vs.filter(v=>/he|iw/i.test(v.lang));const sel=$('#voiceSel');if(!sel)return;sel.innerHTML=(he.length?he:vs).map(v=>`<option value="${v.name}" ${v.name===S.voice?'selected':''}>${v.name}</option>`).join('')||'<option>אין קול עברי מותקן</option>'}
 fillVoices();speechSynthesis.onvoiceschanged=fillVoices;$('#voiceSel').onchange=e=>{S.voice=e.target.value;saveS();const u=new SpeechSynthesisUtterance('שלום אדיר, זה הקול להתראות.');u.lang='he-IL';u.voice=speechSynthesis.getVoices().find(v=>v.name===S.voice);speechSynthesis.speak(u)};
-$('#sSave').onclick=()=>{S={...S,eco:$('#sEco').checked,provider:$('#sProv').value,gem:$('#sGem').value.trim(),gemModel:$('#sGemModel').value.trim()||'gemini-3.6-flash',anth:$('#sAnth').value.trim(),td:$('#sTd').value.trim(),fh:$('#sFh').value.trim(),tgT:$('#sTgT').value.trim(),tgC:$('#sTgC').value.trim(),risk:+$('#sRisk').value||0,acct:+$('#sAcct').value||0,mon:$('#sMon').checked,auto:$('#sAuto').checked,ibkr:$('#sIbkr').checked,newsMin:+$('#sNewsMin').value||30,vp:$('#sVp').value.trim()};if(S.vp&&S.vp.length<12){toast('סיסמת סנכרון: לפחות 12 תווים');return}saveS();loadSettingsUI();startMonitor();startNewsTimer();ibkrSync();toast('נשמר');vaultSync()};
+$('#sSave').onclick=()=>{S={...S,eco:$('#sEco').checked,provider:$('#sProv').value,gem:$('#sGem').value.trim(),gemModel:$('#sGemModel').value.trim()||'gemini-3.6-flash',anth:$('#sAnth').value.trim(),td:$('#sTd').value.trim(),fh:$('#sFh').value.trim(),tgT:$('#sTgT').value.trim(),tgC:$('#sTgC').value.trim(),risk:+$('#sRisk').value||0,acct:+$('#sAcct').value||0,mon:$('#sMon').checked,auto:$('#sAuto').checked,ibkr:$('#sIbkr').checked,newsMin:+$('#sNewsMin').value||30,vp:$('#sVp').value.trim()};if(S.vp&&S.vp.length<6){toast('קוד סנכרון: לפחות 6 תווים');return}saveS();loadSettingsUI();startMonitor();startNewsTimer();ibkrSync();toast('נשמר');vaultSync()};
 $('#sTestAlert').onclick=()=>{D.alerts=D.alerts.filter(a=>a.key!=='test');fire('test','בדיקה: MSTR נגע ב-138.08 – הלימיט של 350 מניות כנראה התמלא. אשר כניסה ביומן.');Notification.requestPermission()};
 $('#sTest').onclick=async()=>{toast(await telegram('✅ יומן המסחר מחובר')?'נשלח':'נכשל – בדוק token/chat id')};
 
@@ -1928,11 +1929,11 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-dm]');if(!
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){['tmodal','modal','whoModal','chatp'].forEach(id=>{const el=$('#'+id);if(el)el.classList.remove('on')})}});
 $$('.drop').forEach(z=>{z.addEventListener('dragover',e=>{e.preventDefault();z.style.borderColor='var(--btc)'});z.addEventListener('dragleave',()=>z.style.borderColor='');z.addEventListener('drop',e=>{e.preventDefault();z.style.borderColor='';const f=e.dataTransfer.files[0];if(!f)return;const inp=z.querySelector('input[type=file]');const dt=new DataTransfer();dt.items.add(f);inp.files=dt.files;inp.dispatchEvent(new Event('change'))})});
 function unlockVault(){const box=document.createElement('div');box.className='modal on';box.id='wiz';
-  box.innerHTML=`<div class="box"><h3>🔐 ברוך השב</h3><div class="hint" style="margin-bottom:10px">המפתחות שלך שמורים מוצפנים בענן. הקלד את סיסמת הסנכרון פעם אחת, והמכשיר הזה יזכור אותה.</div>
-  <div class="set"><label>סיסמת סנכרון</label><input id="uPw" type="password" autocomplete="current-password" placeholder="הסיסמה שקבעת במכשיר הראשון">
-  <button class="btn" id="uOk" style="margin-top:14px">פתח</button><button class="btn ghost" id="uManual" style="margin-top:8px">אין לי סיסמה, אזין מפתחות ידנית</button></div></div>`;
+  box.innerHTML=`<div class="box"><h3>🔐 ברוך השב</h3><div class="hint" style="margin-bottom:10px">המפתחות שלך שמורים מוצפנים בענן. הקלד את קוד הסנכרון פעם אחת, והמכשיר הזה יזכור אותו.</div>
+  <div class="set"><label>קוד סנכרון</label><input id="uPw" type="text" autocomplete="off" autocapitalize="off" placeholder="הקוד שקבעת במכשיר הראשון">
+  <button class="btn" id="uOk" style="margin-top:14px">פתח</button><button class="btn ghost" id="uManual" style="margin-top:8px">אין לי קוד, אזין מפתחות ידנית</button></div></div>`;
   document.body.appendChild(box);
-  const go=async()=>{const pw=$('#uPw').value;if(!pw)return;try{const k=await vaultOpen(D.vault,pw);S={...S,...k,vp:pw};if(S.anth||S.gem)S.provider='auto';saveS();loadSettingsUI();box.remove();toast('מוכן. טוען…');renderAll();startMonitor();autoNews(true)}catch(e){toast('סיסמה שגויה')}};
+  const go=async()=>{const pw=$('#uPw').value;if(!pw)return;try{const k=await vaultOpen(D.vault,pw);S={...S,...k,vp:pw};if(S.anth||S.gem)S.provider='auto';saveS();loadSettingsUI();box.remove();toast('מוכן. טוען…');renderAll();startMonitor();autoNews(true)}catch(e){toast('קוד שגוי')}};
   $('#uOk').onclick=go;$('#uPw').onkeydown=e=>{if(e.key==='Enter')go()};
   $('#uManual').onclick=()=>{box.remove();firstRun(true)}}
 function firstRun(manual){if(aiKey()&&S.fh)return;if(!manual&&D&&D.vault&&!(S.anth||S.gem||S.td||S.fh)){unlockVault();return}const box=document.createElement('div');box.className='modal on';box.id='wiz';box.innerHTML=`<div class="box"><h3>👋 3 מפתחות ואתה באוויר</h3>
@@ -1941,10 +1942,10 @@ function firstRun(manual){if(aiKey()&&S.fh)return;if(!manual&&D&&D.vault&&!(S.an
     <label>1. מוח (Anthropic) – ניתוח, חדשות, צ'אט</label><input id="wAnth" placeholder="sk-ant-..." value="${S.anth||''}"><div class="hint">console.anthropic.com → API Keys → Create</div>
     <label>2. מחירים חיים (Finnhub) – חינם</label><input id="wFh" placeholder="finnhub key" value="${S.fh||''}"><div class="hint">finnhub.io → Get free API key</div>
     <label>3. נרות לניתוח (Twelve Data) – חינם</label><input id="wTd" placeholder="twelvedata key" value="${S.td||''}"><div class="hint">twelvedata.com → API Keys</div>
-    <label>4. סיסמת סנכרון (רשות) – מסנכרנת את המפתחות לכל מכשיר, מוצפנים</label><input id="wVp" type="password" placeholder="לפחות 12 תווים" autocomplete="new-password" value="${S.vp||''}"><div class="hint">במכשיר אחר תקליד רק אותה, במקום 3 מפתחות.</div>
+    <label>4. קוד סנכרון קצר (רשות) – מסנכרן את המפתחות לכל מכשיר, מוצפנים</label><input id="wVp" type="text" placeholder="לפחות 6 תווים, מומלץ 8" autocomplete="off" value="${S.vp||''}"><div class="hint">במכשיר אחר תקליד רק אותו, במקום 3 מפתחות.</div>
     <button class="btn" id="wOk" style="margin-top:14px">שמור והתחל</button><button class="btn ghost" id="wSkip" style="margin-top:8px">אחר כך</button>
   </div></div>`;document.body.appendChild(box);
-  $('#wOk').onclick=()=>{S.anth=$('#wAnth').value.trim()||S.anth;S.fh=$('#wFh').value.trim()||S.fh;S.td=$('#wTd').value.trim()||S.td;const vp=$('#wVp').value.trim();if(vp&&vp.length<12){toast('סיסמת סנכרון: לפחות 12 תווים');return}if(vp)S.vp=vp;if(S.anth)S.provider='auto';saveS();loadSettingsUI();box.remove();toast('מוכן. טוען…');renderAll();startMonitor();autoNews(true);vaultSync()};
+  $('#wOk').onclick=()=>{S.anth=$('#wAnth').value.trim()||S.anth;S.fh=$('#wFh').value.trim()||S.fh;S.td=$('#wTd').value.trim()||S.td;const vp=$('#wVp').value.trim();if(vp&&vp.length<6){toast('קוד סנכרון: לפחות 6 תווים');return}if(vp)S.vp=vp;if(S.anth)S.provider='auto';saveS();loadSettingsUI();box.remove();toast('מוכן. טוען…');renderAll();startMonitor();autoNews(true);vaultSync()};
   $('#wSkip').onclick=()=>box.remove()}
 
 /* ================= ניווט ================= */
