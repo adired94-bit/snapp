@@ -47,7 +47,16 @@
       if (tt && href) out.push({ title: tt.textContent.trim(), link: href.trim(), t: dt ? new Date(dt.textContent).getTime() || 0 : 0 });
     }); return out;
   }
+  /* דרך השרת של האתר (פונקציית Netlify): בלי CORS ובלי מגבלות של שירותי צד שלישי. אם היא לא זמינה, חוזרים לשיטה הישנה */
+  async function viaServer(list) {
+    var map = {}, okAny = false, groups = []; for (var i = 0; i < list.length; i += 6) groups.push(list.slice(i, i + 6));
+    await Promise.all(groups.map(async function (g) {
+      try { var r = await fetch('/.netlify/functions/rss?' + g.map(function (f) { return 'u=' + encodeURIComponent(f.u); }).join('&')); if (!r.ok) return; var j = await r.json(); if (!j || !j.feeds) return; okAny = true; j.feeds.forEach(function (x) { map[x.u] = x; }); } catch (e) { }
+    }));
+    return okAny ? map : null;
+  }
   async function pull(f) {
+    if (ST.srv) { var x = ST.srv[f.u]; if (x && x.err !== 'domain not allowed') return (x.items || []).map(function (i) { return { title: i.title, link: i.link, t: i.t || 0 }; }); }
     try { var r = await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(f.u)), j = await r.json(); if (j && j.items && j.items.length) return j.items.map(function (i) { return { title: i.title, link: i.link, t: new Date((i.pubDate || '').replace(' ', 'T') + (/Z|\+/.test(i.pubDate || '') ? '' : 'Z')).getTime() || 0 }; }); } catch (e) { }
     try { var r2 = await fetch('https://api.allorigins.win/raw?url=' + encodeURIComponent(f.u)); if (r2.ok) return parseXml(await r2.text(), f); } catch (e) { }
     return [];
@@ -59,18 +68,18 @@
   }
   async function load(force) {
     if (ST.busy || (!force && Date.now() - ST.t < 5 * 60e3)) return; ST.busy = true; paint();
-    var all = [], parts = await Promise.all(feeds().map(function (f) { return pull(f).then(function (a) { return a.slice(0, 40).map(function (i) { var ti = i.title, sr = f.n; if (f.gn) { var m = ti.match(/^(.*) - ([^-]{2,40})$/); if (m) { ti = m[1]; sr = m[2]; } } return { title: ti, link: i.link, t: i.t, src: sr, c: f.c, en: !!f.en && !isHe(ti) }; }); }); }).concat([finnhub()]));
+    ST.srv = await viaServer(feeds()); var all = [], parts = await Promise.all(feeds().map(function (f) { return pull(f).then(function (a) { return a.slice(0, 40).map(function (i) { var ti = i.title, sr = f.n; if (f.gn) { var m = ti.match(/^(.*) - ([^-]{2,40})$/); if (m) { ti = m[1]; sr = m[2]; } } return { title: ti, link: i.link, t: i.t, src: sr, c: f.c, en: !!f.en && !isHe(ti) }; }); }); }).concat([finnhub()]));
     parts.forEach(function (a) { all = all.concat(a); });
     var seen = {}, cut = Date.now() - 2 * 864e5;
     ST.items = all.filter(function (i) { if (!i.title || !/^https?:/.test(i.link)) return false; if (i.t && i.t < cut) return false; var k = i.title.toLowerCase().replace(/[^a-z0-9֐-׿]/g, '').slice(0, 60); if (seen[k]) return false; seen[k] = 1; i.en = i.en && !isHe(i.title); return true; })
       .sort(function (a, b) { return (b.t || 0) - (a.t || 0); });
-    ST.t = Date.now(); ST.busy = false; paint(); speakNew();
+    ST.stat = { ok: parts.filter(function (a) { return a.length; }).length, total: parts.length - 1, srv: !!ST.srv }; ST.t = Date.now(); ST.busy = false; paint(); speakNew();
   }
   function paint() {
     var list = ST.items.filter(function (i) { return ST.cat === 'all' || i.c === ST.cat; }), cnt = {}; ST.items.forEach(function (i) { cnt[i.c] = (cnt[i.c] || 0) + 1; });
     var hasEn = list.some(function (i) { return i.en && !ST.tr[i.title]; });
     var chips = '<div class="tabs wire-tabs" style="margin:0 0 6px">' + CH.map(function (c) { return '<button data-wc="' + c[0] + '"' + (ST.cat === c[0] ? ' class="on"' : '') + '>' + c[1] + (c[0] === 'all' ? ' ' + ST.items.length : cnt[c[0]] ? ' ' + cnt[c[0]] : '') + '</button>'; }).join('') + '</div>';
-    var tools = '<div class="wire-tools" style="display:flex;gap:10px;font-size:12px;color:var(--ink2);margin:0 2px 4px;align-items:center">' + (ST.t ? '<span>עודכן ' + new Date(ST.t).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '<a href="#" data-wr>רענן</a><a href="#" data-wq>' + (S.squawk ? 'קריין: פועל' : 'קריין חדשות') + '</a><a href="#" data-wa>הוסף אתר</a><span>' + feeds().length + ' מקורות</span>' + (hasEn && typeof aiKey === 'function' && aiKey() ? '<a href="#" data-wt>תרגם לעברית</a>' : '') + '</div>';
+    var tools = '<div class="wire-tools" style="display:flex;gap:10px;font-size:12px;color:var(--ink2);margin:0 2px 4px;align-items:center">' + (ST.t ? '<span>עודכן ' + new Date(ST.t).toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }) + '</span>' : '') + '<a href="#" data-wr>רענן</a><a href="#" data-wq>' + (S.squawk ? 'קריין: פועל' : 'קריין חדשות') + '</a><a href="#" data-wa>הוסף אתר</a><span>' + (ST.stat ? ST.stat.ok + ' מתוך ' + ST.stat.total + ' מקורות הגיבו' : feeds().length + ' מקורות') + '</span>' + (hasEn && typeof aiKey === 'function' && aiKey() ? '<a href="#" data-wt>תרגם לעברית</a>' : '') + '</div>';
     var body = ST.busy && !ST.items.length ? '<div class="empty">טוען חדשות מכל המקורות…</div>' : list.length ? list.slice(0, 120).map(function (i) {
       var ttl = ST.tr[i.title] || i.title; return '<div class="ni" style="padding:8px 4px"><div class="top"><span>' + esc(i.src) + (i.t ? ' · ' + new Date(i.t).toLocaleString('he-IL', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '') + '</span></div><a href="' + esc(i.link) + '" target="_blank" rel="noopener" style="font-size:14px;color:var(--ink);margin-top:2px"' + (i.en && !ST.tr[i.title] ? ' dir="ltr"' : '') + '>' + esc(ttl) + '</a></div>'; }).join('') : '<div class="empty">לא הצלחתי למשוך חדשות כרגע. נסה לרענן.</div>';
     ['#rss', '#rss2'].forEach(function (s) { var el = $q(s); if (el) el.innerHTML = chips + tools + body; });
