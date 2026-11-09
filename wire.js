@@ -7,9 +7,7 @@
   var g = function (q, hl) { return 'https://news.google.com/rss/search?q=' + encodeURIComponent(q + ' when:2d') + (hl ? '&hl=iw&gl=IL&ceid=IL:iw' : '&hl=en-US&gl=US&ceid=US:en'); };
   var FEEDS = [
     { n: 'גלובס', c: 'il', u: 'https://www.globes.co.il/webservice/rss/rssfeeder.asmx/FeederNode?iID=585' },
-    { n: 'כלכליסט', c: 'il', u: 'https://www.calcalist.co.il/GENERALRSS/0,16335,L-3928,00.xml' },
-    { n: 'ביזפורטל', c: 'il', u: 'https://www.bizportal.co.il/rss/bizportal-news.xml' },
-    { n: 'חדשות הבורסה בישראל', c: 'il', u: g('בורסה OR "ת"א 35" OR מניות OR "שוק ההון"', 1) },
+            { n: 'חדשות הבורסה בישראל', c: 'il', u: g('בורסה OR "ת"א 35" OR מניות OR "שוק ההון"', 1) },
     { n: 'פאנדר', c: 'il', u: g('site:funder.co.il', 1) },
     { n: 'דה מרקר', c: 'il', u: g('site:themarker.com בורסה OR מניות OR שוק ההון', 1) },
     { n: 'מעריב וכלכלה', c: 'il', u: g('site:ice.co.il OR site:mako.co.il OR site:maariv.co.il בורסה OR מניות OR וול סטריט', 1) },
@@ -18,8 +16,7 @@
     { n: 'CNBC', c: 'us', en: 1, u: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114' },
     { n: 'CNBC Investing', c: 'us', en: 1, u: 'https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=15839069' },
     { n: 'MarketWatch', c: 'us', en: 1, u: 'https://feeds.content.dowjones.io/public/rss/mw_topstories' },
-    { n: 'Yahoo Finance', c: 'us', en: 1, u: 'https://finance.yahoo.com/news/rssindex' },
-    { n: 'Seeking Alpha', c: 'us', en: 1, u: 'https://seekingalpha.com/market_currents.xml' },
+        { n: 'Seeking Alpha', c: 'us', en: 1, u: 'https://seekingalpha.com/market_currents.xml' },
     { n: 'פוליטיקה ומאקרו', c: 'macro', en: 1, u: g('Trump OR Fed OR Powell OR tariffs OR sanctions stocks market') },
     { n: 'ריבית ותשואות', c: 'macro', en: 1, u: g('Treasury yields OR inflation OR "rate cut" OR "jobs report"') },
     { n: 'אנליסטים', c: 'an', en: 1, u: g('analyst upgrade OR downgrade OR "price target" stock') },
