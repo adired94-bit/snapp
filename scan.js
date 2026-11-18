@@ -248,7 +248,7 @@
       (r.why.length ? '<ul class="dp-list pos sc-l">' + r.why.slice(0, 4).map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>' : '') +
       (r.risks.length ? '<ul class="dp-list neg sc-l">' + r.risks.slice(0, 3).map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>' : '') +
       '<div class="sm-pl"><span>כניסה <b>$' + px(p.entry) + '</b></span><span>סטופ <b class="down">$' + px(p.stop) + '</b></span><span>יעד 1 <b class="up">$' + px(p.t1) + '</b></span><span>יעד 2 <b class="up">$' + px(p.t2) + '</b></span><span>כמות <b>' + (p.qty || '–') + '</b></span></div>' +
-      '<div class="sm-a"><button data-a="deep">ניתוח</button><button data-a="calc">גודל</button><button data-a="save">שמור</button></div></div>';
+      '<div class="sm-a"><button data-a="deep" class="sm-full">סקירה מלאה</button><button data-a="calc">גודל</button><button data-a="save">שמור</button></div></div>';
   }
   function specCard(x) {
     var days = x.date ? Math.round((Date.parse(x.date) - Date.now()) / 864e5) : null, cap = x.cap != null ? (x.cap >= 1000 ? '$' + num(x.cap / 1000, 1) + 'B' : '$' + num(x.cap, 0) + 'M') : '–';
@@ -257,11 +257,11 @@
       '<div class="sm-kv">' + esc(x.name) + ' · שווי שוק ' + cap + (x.ind ? ' · ' + esc(x.ind) : '') + (x.over5 ? ' · <em class="warn">מעל $5</em>' : '') + '</div>' +
       '<p class="sp-c">' + esc(x.catalyst) + '</p>' + (x.why ? '<ul class="dp-list pos sc-l"><li>' + esc(x.why) + '</li></ul>' : '') + (x.risk ? '<ul class="dp-list neg sc-l"><li>' + esc(x.risk) + '</li></ul>' : '') +
       '<div class="sm-pl"><span>כניסה <b>$' + px(x.price) + '</b></span><span>סטופ (−15%) <b class="down">$' + px(stop) + '</b></span><span>גודל שמרני <b>' + (qty || '–') + '</b></span><span>סיכון <b>$' + num(qty * x.price * 0.15, 0) + '</b></span></div>' +
-      '<div class="sm-a"><a class="sp-src" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.source) + ' ↗</a><button data-a="deep">ניתוח</button><button data-a="save">שמור</button></div></div>';
+      '<div class="sm-a"><a class="sp-src" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.source) + ' ↗</a><button data-a="deep" class="sm-full">סקירה מלאה</button><button data-a="save">שמור</button></div></div>';
   }
   function paintLive() {
     var el = $q('#scLive'); if (!el) return; if (!ST.busy) { el.innerHTML = ''; return; } var done = {}; (ST.live || []).forEach(function (x) { done[x.split(' ')[0]] = 1; });
-    var pre = ST.pre && ST.pre.length ? '<div class="dp-foot" style="text-align:right"><b>מועמדות ראשוניות</b> (נבדקות עכשיו לעומק, אפשר ללחוץ לניתוח מלא):</div><div class="opp-ch">' + ST.pre.map(function (x) { return '<button data-ps="' + esc(x.sym) + '" class="opp-c ' + x.side + '" style="' + (done[x.sym] ? 'opacity:.6' : '') + '"><b dir="ltr">' + esc(x.sym) + '</b><span>' + (x.side === 'long' ? 'לונג' : 'שורט') + (done[x.sym] ? ' · נבדקה' : '') + (x.hot[0] ? ' · ' + esc(x.hot[0]) : '') + '</span></button>'; }).join('') + '</div>' : '';
+    var pre = ST.pre && ST.pre.length ? '<div class="dp-foot" style="text-align:right"><b>מועמדות ראשוניות</b> (נבדקות עכשיו לעומק, לחיצה פותחת סקירה מלאה):</div><div class="opp-ch">' + ST.pre.map(function (x) { return '<button data-ps="' + esc(x.sym) + '" class="opp-c ' + x.side + '" style="' + (done[x.sym] ? 'opacity:.6' : '') + '"><b dir="ltr">' + esc(x.sym) + '</b><span>' + (x.side === 'long' ? 'לונג' : 'שורט') + (done[x.sym] ? ' · נבדקה' : '') + (x.hot[0] ? ' · ' + esc(x.hot[0]) : '') + '</span></button>'; }).join('') + '</div>' : '';
     el.innerHTML = pre + (ST.live && ST.live.length ? '<div class="dp-foot" style="text-align:right"><b>כבר נותחו:</b> ' + ST.live.map(esc).join(' · ') + '</div>' : '');
     el.querySelectorAll('[data-ps]').forEach(function (bt) { bt.onclick = function () { window.openDeep(bt.dataset.ps); }; });
   }
