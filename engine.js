@@ -899,7 +899,7 @@
     }).then(function (r) {
       if (!r.ok && r.status !== 200) {
         if (r.status === 429) {
-          if (attempt < 3) { var lm = limiter || self.limiter; lm.q = []; for (var i = 0; i < lm.max; i++) lm.q.push(lm.now()); if (self.onRetry) try { self.onRetry(attempt + 1); } catch (e) { } return self._json(url, limiter, attempt + 1); }
+          if (attempt < 3) { var lm = limiter || self.limiter; lm.q = []; for (var i = 0; i < lm.max; i++) lm.q.push(lm.now()); if (self.onRetry) try { self.onRetry(attempt + 1); } catch (e) { } var dly = Math.min(20000, (lm.win || 60000) / 3); return new Promise(function (r) { setTimeout(r, dly); }).then(function () { return self._json(url, limiter, attempt + 1); }); }
           throw new Error('חריגה ממגבלת קצב (429)');
         }
         if (r.status === 401 || r.status === 403) throw new Error('מפתח API לא תקין (' + r.status + ')');

@@ -190,7 +190,7 @@
     if (ST.busy) { ST.stop = true; return; }
     opts = opts || {}; var mode = opts.custom ? 'custom' : (opts.mode || ST.mode);
     if (!S.td) return toast('צריך מפתח Twelve Data בהגדרות (⚙️)');
-    var groups, per = mode === 'quick' ? 2 : 5, sectorMode = mode === 'sectors' || mode === 'quick';
+    var groups, per = mode === 'quick' ? 1 : 5, sectorMode = mode === 'sectors' || mode === 'quick';
     if (mode === 'custom') groups = [{ k: 'custom', n: 'הרשימה שלך', syms: opts.custom.slice(0, 20) }];
     else if (mode === 'mine') groups = [{ k: 'mine', n: 'הרשימות שלי', syms: mine().slice(0, 30) }];
     else groups = SECTORS.map(function (g) { return { k: g.k, n: g.n, syms: (mode === 'quick' ? g.syms.slice(0, 6) : g.syms.slice()) }; });
@@ -203,6 +203,7 @@
       var list;
       if (sectorMode && S.fh) { report.failed = await stage1(groups); if (!groups.some(function (g) { return g.rows && g.rows.length; })) throw new Error('לא התקבלו נתונים מ-Finnhub. הרץ "בדיקת חיבורים" כדי לראות למה.'); }
       list = sectorMode ? pickPerSector(groups, per) : groups[0].syms.map(function (sym) { return { sym: sym, sector: groups[0].n, gk: groups[0].k }; });
+      ST.pre = list.map(function (r) { return { sym: r.sym, side: r.side1 || (r.L >= r.S ? 'long' : 'short'), hot: (r.hot || []).slice(0, 1), done: false }; }); paintLive();
       ST.stage = 2; setMsg('בודק את מצב השוק (SPY)…'); var spy = null; try { spy = barsGet('SPY') || await c.series('SPY', '1day', 300); if (spy && !barsGet('SPY')) barsPut('SPY', spy); } catch (e) { }
       report.regime = DP.regimeOf(spy);
       var rows = await deepAll(list, spy, report.regime, report.failed);
@@ -213,7 +214,7 @@
       setMsg(ST.stop ? 'הסריקה נעצרה' : 'מחפש מניות ספקולטיביות…'); paint(); renderHome();
       report.spec = await specP; ST.report = report; persist(); setMsg(ST.stop ? 'הסריקה נעצרה' : '');
     } catch (e) { setMsg('הסריקה נכשלה: ' + e.message); toast(e.message.slice(0, 80)); }
-    ST.busy = false; ST.stage = 0; paint(); renderHome();
+    ST.busy = false; ST.stage = 0; ST.pre = null; paint(); renderHome();
   }
 
   /* ---------- אבחון חיבורים ---------- */
@@ -258,7 +259,12 @@
       '<div class="sm-pl"><span>כניסה <b>$' + px(x.price) + '</b></span><span>סטופ (−15%) <b class="down">$' + px(stop) + '</b></span><span>גודל שמרני <b>' + (qty || '–') + '</b></span><span>סיכון <b>$' + num(qty * x.price * 0.15, 0) + '</b></span></div>' +
       '<div class="sm-a"><a class="sp-src" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.source) + ' ↗</a><button data-a="deep">ניתוח</button><button data-a="save">שמור</button></div></div>';
   }
-  function paintLive() { var el = $q('#scLive'); if (!el) return; el.innerHTML = ST.busy && ST.live && ST.live.length ? '<div class="dp-foot" style="text-align:right"><b>כבר נותחו:</b> ' + ST.live.map(esc).join(' · ') + '</div>' : ''; }
+  function paintLive() {
+    var el = $q('#scLive'); if (!el) return; if (!ST.busy) { el.innerHTML = ''; return; } var done = {}; (ST.live || []).forEach(function (x) { done[x.split(' ')[0]] = 1; });
+    var pre = ST.pre && ST.pre.length ? '<div class="dp-foot" style="text-align:right"><b>מועמדות ראשוניות</b> (נבדקות עכשיו לעומק, אפשר ללחוץ לניתוח מלא):</div><div class="opp-ch">' + ST.pre.map(function (x) { return '<button data-ps="' + esc(x.sym) + '" class="opp-c ' + x.side + '" style="' + (done[x.sym] ? 'opacity:.6' : '') + '"><b dir="ltr">' + esc(x.sym) + '</b><span>' + (x.side === 'long' ? 'לונג' : 'שורט') + (done[x.sym] ? ' · נבדקה' : '') + (x.hot[0] ? ' · ' + esc(x.hot[0]) : '') + '</span></button>'; }).join('') + '</div>' : '';
+    el.innerHTML = pre + (ST.live && ST.live.length ? '<div class="dp-foot" style="text-align:right"><b>כבר נותחו:</b> ' + ST.live.map(esc).join(' · ') + '</div>' : '');
+    el.querySelectorAll('[data-ps]').forEach(function (bt) { bt.onclick = function () { window.openDeep(bt.dataset.ps); }; });
+  }
   function paint() {
     var host = $q('#scOut'); if (!host) return; paintLive();
     var go = $q('#scGo'); if (go) go.textContent = ST.busy ? 'עצור' : 'סרוק';
@@ -345,12 +351,13 @@
       '<div class="dp-seg" id="scMode"><button data-m="quick">מהיר</button><button data-m="sectors">מלא</button><button data-m="mine">הרשימות שלי</button><button data-m="custom">הדבק מניות</button></div>' +
       '<div id="scCustomW" style="display:none"><textarea id="scTxt" class="sm-txt" rows="3" dir="ltr" placeholder="NVDA MU AMD   או   NASDAQ:NVDA NYSE:BA"></textarea></div>' +
       '<label id="scSpecW" class="sc-spec"><input type="checkbox" id="scSpec" checked> כולל מניות עד $5</label>' +
-      '<div class="sc-diag"><button class="btn ghost small" id="scDiagGo">בדיקת חיבורים</button><div id="scDiag"></div></div></div></details></div><div id="scLive"></div><div id="scOut"></div>';
+      '<div class="sc-diag"><label style="display:block;font-size:13px;color:var(--ink2);margin:6px 0">קצב קריאות בדקה ל-Twelve Data (חינם: 7. אם שדרגת תוכנית, הגדל כדי שהסריקה תהיה מהירה)</label><input id="scTdMax" type="number" min="1" max="800" style="width:100%;height:44px;font-size:16px;margin-bottom:8px;padding:0 12px;background:var(--panel);border:1px solid var(--line);border-radius:10px;color:var(--ink)"><button class="btn ghost small" id="scDiagGo">בדיקת חיבורים</button><div id="scDiag"></div></div></div></details></div><div id="scLive"></div><div id="scOut"></div>';
     document.querySelector('main').appendChild(sec);
     document.querySelectorAll('#scMode button').forEach(function (b) { b.onclick = function () { ST.mode = b.dataset.m; paint(); }; });
     $q('#scGo').onclick = function () { if (ST.busy) { ST.stop = true; return; } if (ST.mode === 'custom') { var c = parseSyms($q('#scTxt').value); if (!c.length) return toast('הדבק לפחות סימול אחד'); run({ custom: c }); } else run({ mode: ST.mode }); };
     $q('#scSpec').onchange = function () { ST.spec = this.checked; };
     $q('#scDiagGo').onclick = diagnose;
+    var tm = $q('#scTdMax'); if (tm) { tm.value = +S.tdMax > 0 ? S.tdMax : 7; tm.onchange = function () { S.tdMax = Math.max(1, Math.min(800, +tm.value || 7)); saveS(); toast('נשמר: ' + S.tdMax + ' קריאות בדקה'); }; }
   }
   build();
   GROUPS.scan = GROUPS.scan.filter(function (x) { return x[0] !== 'p-smart'; }); GROUPS.scan.splice(0, 0, ['p-smart', 'סריקה']); PAGE_GROUP['p-smart'] = 'scan';
