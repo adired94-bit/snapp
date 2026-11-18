@@ -24,9 +24,18 @@
     var stub = function () { return { mode: 'swing', ex: { score: tech ? tech.score : null, headline: '', pros: [], risks: [] }, an: { combined: { vetoes: [] } }, base: null, plan: null, sf: 1, gates: { items: [], failed: 0, unknown: 0, ok: true, status: 'ready' } }; };
     var res = { sym: sym, bars: bars ? { '1D': bars } : {}, price: price, fund: fund, fs: fs, news: news, earn: earn, days: earn && earn.date ? Math.round((Date.parse(earn.date) - Date.now()) / 864e5) : null, ctx: null, regime: null, modes: { day: stub(), swing: stub(), long: stub() }, at: Date.now(), ai: {} };
     if (typeof aiKey === 'function' && aiKey() && window.DeepCtx) { msg('מחפש ברשת חדשות, מאקרו ודירוגי בתי השקעות וברוקרים (עד חצי דקה)…'); try { await DeepCtx.start(res); } catch (e) { out.ctxErr = e.message; } } else out.noAi = true;
-    out.res = res; out.uni = DP.uniFor(res, res.modes.swing, 'swing'); out.ai = res.ctx && res.ctx.ai && !res.ctx.ai.err ? res.ctx.ai : null; out.t = Date.now(); CACHE[sym] = out; return out;
+    out.res = res; out.crit = critical(res, t); out.uni = DP.uniFor(res, res.modes.swing, 'swing'); out.ai = res.ctx && res.ctx.ai && !res.ctx.ai.err ? res.ctx.ai : null; out.t = Date.now(); CACHE[sym] = out; return out;
   }
 
+  /* ---------- חדשות קריטיות: סימון של הבינה, ובנוסף זיהוי לפי מילות מפתח בכותרות מ-72 השעות האחרונות ---------- */
+  var KEY = /\b(halt(ed)?|trading halt|sec (probe|investigation)|investigation|probe|lawsuit|sues?|class action|fraud|bankruptcy|chapter 11|delist|going concern|(cuts?|lowers?|slash(es)?) (guidance|outlook|forecast)|profit warning|preannounce|recall|fda|complete response|merger|acquir(e|es|ed)|acquisition|takeover|buyout|short seller|short report|resigns?|steps? down|offering|dilution|downgrad(e|es|ed)|tariffs?|sanctions?|export ban|data breach|cyber ?attack|stock split)\b|חקירה|תביעה|הונאה|פשיטת רגל|מחיקה ממסחר|אזהרת רווח|הורדת תחזית|מיזוג|רכישה|הצעת רכש|עצירת מסחר|התפטר|הנפקה|דילול|דוח שורט|מכס|סנקציות|פריצת סייבר/i;
+  function critical(res, t) {
+    var sg = t.dir === 'long' ? 1 : -1, out = [], seen = {}, add = function (x) { var k = x.title.toLowerCase().slice(0, 60); if (seen[k]) return; seen[k] = 1; out.push(x); };
+    var ai = res.ctx && res.ctx.ai && !res.ctx.ai.err ? res.ctx.ai : null;
+    if (ai) ['macro', 'sector', 'company', 'politics', 'analysts', 'events'].forEach(function (c) { (ai[c] || []).forEach(function (i) { if (i.critical === true) add({ title: i.point, why: i.why || '', src: i.source || '', url: i.url, date: i.date || '', eff: i.effect === 'up' ? sg : i.effect === 'down' ? -sg : 0, ai: true }); }); });
+    var cut = Date.now() - 3 * 864e5; (DP.headlines ? DP.headlines(res) : []).forEach(function (h) { if ((h.t && h.t < cut) || !KEY.test(h.title)) return; add({ title: h.title, why: '', src: h.src || '', url: h.url || '', date: h.t ? new Date(h.t).toISOString().slice(0, 10) : '', eff: h.s > 0.2 ? sg : h.s < -0.2 ? -sg : 0, ai: false }); });
+    return out.slice(0, 5);
+  }
   /* ---------- המלצה לפוזיציה ---------- */
   function advise(t, o) {
     var sg = t.dir === 'long' ? 1 : -1, S0 = o.uni.score * sg, px = o.price, entry = t.entryPrice || t.plan.entry, stop = t.plan.stop, risk = Math.abs(entry - stop) || 0, Rnow = risk ? ((px - entry) * sg) / risk : 0;
@@ -37,6 +46,8 @@
     else if (S0 < 18) { k = 'tight'; txt = 'להחזיק בזהירות ולהדק סטופ'; why = 'אין כיוון ברור: הפוזיציה לא נתמכת ולא נסתרת.'; }
     else if (S0 >= 40) { k = 'hold'; txt = 'להחזיק'; why = 'רוב הרכיבים תומכים בכיוון הפוזיציה.'; }
     else { k = 'hold'; txt = 'להחזיק, בלי להוסיף'; why = 'יש תמיכה מתונה בכיוון הפוזיציה.'; }
+    var against = (o.crit || []).filter(function (c) { return c.eff < 0; });
+    if (against.length && k !== 'exit') { k = 'reduce'; txt = 'לשקול לצמצם: יש חדשה קריטית נגד הפוזיציה'; why = against[0].title; }
     var sugg = null; if (k !== 'exit') { var cand = []; if (Rnow >= 2) cand.push(entry + sg * risk); else if (Rnow >= 1) cand.push(entry); if (atr && S0 >= 18) cand.push(px - sg * 2 * atr); cand = cand.filter(function (v) { return sg > 0 ? v > stop && v < px : v < stop && v > px; }); if (cand.length) sugg = sg > 0 ? Math.max.apply(null, cand) : Math.min.apply(null, cand); }
     var warn = []; if (ed != null && ed >= 0 && ed <= 7) warn.push('דוח רבעוני בעוד ' + ed + ' ימים: פער מחיר אפשרי. כדאי לצמצם או להבטיח סטופ.');
     if (o.uni.conflict) warn.push('סתירה בין הניתוח הטכני לחדשות והמאקרו.');
@@ -50,6 +61,7 @@
   function render(t, o) {
     var a = advise(t, o), res = o.res, ai = o.ai, f = o.fund || {}, rec = f.rec, h = '';
     var tiles = [['טכני', part(o, ['tech'])], ['חדשות', part(o, ['headlines', 'company'])], ['מאקרו', part(o, ['macro', 'politics', 'sector'])], ['בתי השקעות', part(o, ['analysts'])], ['יסודות', part(o, ['fund'])]];
+    if (o.crit && o.crit.length) h += '<div class="pw-crit"><b>חדשות קריטיות (' + o.crit.length + ')</b>' + o.crit.map(function (c) { return '<div class="pw-ci"><span class="pw-tag ' + (c.eff < 0 ? 'bad' : c.eff > 0 ? 'good' : '') + '">' + (c.eff < 0 ? 'נגד הפוזיציה' : c.eff > 0 ? 'לטובת הפוזיציה' : 'השפעה לא ברורה') + '</span><b' + (/[\u0590-\u05FF]/.test(c.title) ? '' : ' dir="ltr"') + '>' + esc(c.title) + '</b>' + (c.why ? '<p>' + esc(c.why) + '</p>' : '') + (c.url ? '<a href="' + esc(c.url) + '" target="_blank" rel="noopener">' + esc(c.src || 'מקור') + (c.date ? ' · ' + esc(c.date) : '') + ' ↗</a>' : '') + '</div>'; }).join('') + '</div>';
     h += '<div class="pw-v ' + a.k + '"><div><small>המלצה לפוזיציה ' + esc(t.ticker) + ' (' + (t.dir === 'long' ? 'לונג' : 'שורט') + ')</small><b>' + esc(a.txt) + '</b><span>' + esc(a.why) + '</span></div><div class="pw-sc"><b dir="ltr">' + (o.uni.score >= 0 ? '+' : '') + o.uni.score + '</b><small>ציון משולב</small></div></div>';
     h += '<div class="pw-tl">' + tiles.map(function (x) { return '<div class="' + tone(x[1]) + '"><small>' + x[0] + '</small><b dir="ltr">' + (x[1] == null ? '–' : (x[1] > 0 ? '+' : '') + x[1]) + '</b><span>' + word(x[1]) + '</span></div>'; }).join('') + '</div>';
     h += '<div class="pw-pos"><div><span>מחיר עכשיו</span><b dir="ltr">' + num(o.price) + '</b></div><div><span>תוצאה</span><b dir="ltr" class="' + (a.Rnow >= 0 ? 'up' : 'down') + '">' + (a.Rnow >= 0 ? '+' : '') + a.Rnow.toFixed(2) + 'R</b></div><div><span>סטופ נוכחי</span><b dir="ltr" class="down">' + num(t.plan.stop) + '</b></div>' + (a.sugg ? '<div><span>סטופ מוצע</span><b dir="ltr" class="up">' + num(a.sugg) + '</b></div>' : '') + '</div>';
@@ -92,5 +104,5 @@
       B.querySelector('#pwSave').onclick = function () { t.log.push({ t: Date.now(), type: 'עדכון', note: 'שקלול פוזיציה: ' + r.a.txt + ' (ציון ' + o.uni.score + ', ' + (r.a.Rnow >= 0 ? '+' : '') + r.a.Rnow.toFixed(1) + 'R)' + (r.a.sugg ? ', סטופ מוצע ' + num(r.a.sugg) : '') }); save(); renderTrades(); toast('נשמר ביומן'); };
     } catch (e) { B.innerHTML = '<div class="dp-empty">השקלול נכשל: ' + esc(e.message) + (/429/.test(e.message) ? '. מגבלת הקצב של ספק הנתונים, נסה בעוד דקה.' : '') + '</div><button class="btn ghost" id="pwAgain">נסה שוב</button>'; B.querySelector('#pwAgain').onclick = function () { open(t, true); }; }
   }
-  window.__pw = { open: open, analyze: analyze, advise: advise };
+  window.__pw = { critical: critical, open: open, analyze: analyze, advise: advise };
 })();
